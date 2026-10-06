@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
     "@roommix/core": "workspace:*"
   },
   "devDependencies": {

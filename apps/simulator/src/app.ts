@@ -77,17 +77,21 @@ export function createApp(store: Store) {
   }
 
   function onServerError(code: string, message: string): void {
+    // Fatal errors send the page back to the lobby; the notice is set after
+    // leave() resolves, because leaving clears whatever notice was showing.
     if (code === 'room_full') {
-      void leave();
-      notify({ tone: 'error', message: `${message}. Try another room name.` });
+      void leave().then(() =>
+        notify({ tone: 'error', message: `${message}. Try another room name.` }),
+      );
     } else if (code === 'replaced') {
       const { room, name } = store.state;
-      void leave();
-      notify({
-        tone: 'error',
-        message: 'You joined from another tab or device, so this one was disconnected.',
-        action: { label: 'Rejoin here', run: () => join(room, name) },
-      });
+      void leave().then(() =>
+        notify({
+          tone: 'error',
+          message: 'You joined from another tab or device, so this one was disconnected.',
+          action: { label: 'Rejoin here', run: () => join(room, name) },
+        }),
+      );
     } else {
       notify({ tone: 'error', message });
     }

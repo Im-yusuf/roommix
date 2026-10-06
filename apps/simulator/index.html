@@ -2,102 +2,186 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0f1012" />
     <title>roommix simulator</title>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <header>
-      <h1>roommix</h1>
-      <span class="row">
+    <header class="topbar">
+      <span class="wordmark">roommix</span>
+      <span class="topbar-actions">
         <span id="connection" class="pill">offline</span>
-        <button id="leave" class="danger small hidden">Leave</button>
+        <button id="leave" class="btn small hidden" type="button">Leave</button>
       </span>
     </header>
 
-    <div id="notice" class="notice hidden" role="status">
-      <span id="notice-text"></span>
-      <button id="notice-action" class="small hidden"></button>
-      <button id="notice-dismiss" class="small ghost" aria-label="Dismiss">✕</button>
-    </div>
-
     <main>
-      <section id="lobby" class="card">
-        <h2>Join a room</h2>
-        <p class="hint">
-          Everyone who joins the same room is mixed into one stream. Open this page on each device
-          (or in two tabs) and use the same room name.
-        </p>
-        <form id="join-form">
-          <label>Room <input id="room" required maxlength="32" pattern="[\w.\-]+" autocomplete="off" value="demo" /></label>
-          <label>Your name <input id="name" required maxlength="32" autocomplete="nickname" /></label>
-          <button type="submit" class="big primary">Join</button>
-        </form>
-      </section>
+      <div id="notice" class="notice hidden" role="status">
+        <span id="notice-text"></span>
+        <button id="notice-action" class="btn small hidden" type="button"></button>
+        <button id="notice-dismiss" class="icon-btn" type="button" aria-label="Dismiss">
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
+        </button>
+      </div>
 
-      <section id="session" class="card hidden">
-        <div>In <strong id="session-room"></strong> as <strong id="session-name"></strong></div>
-        <label>Input
-          <select id="input-kind">
-            <option value="mic">Microphone</option>
-            <option value="fileA">Audio file: device A (Samantha near, Daniel far)</option>
-            <option value="fileB">Audio file: device B (Daniel near, Samantha far)</option>
-          </select>
-        </label>
-        <button id="mic-toggle" class="big primary">Start microphone</button>
-        <div class="meter" aria-label="Input level"><div id="input-meter" class="meter-fill"></div></div>
-        <p id="capture-info" class="hint"></p>
-      </section>
+      <div id="lobby" class="lobby">
+        <h1 class="claim">Every device in the room, mixed into the one stream your backend hears.</h1>
+        <p class="lede">
+          Join the same room from each device. roommix merges what they send into one 16 kHz mono
+          stream, shares gain between them, and plays back exactly what the backend receives.
+        </p>
+        <section class="panel" aria-labelledby="join-heading">
+          <h2 id="join-heading" class="visually-hidden">Join a room</h2>
+          <form id="join-form" class="join">
+            <label class="field">
+              <span>Room</span>
+              <input id="room" required maxlength="32" pattern="[\w.\-]+" autocomplete="off" value="demo" />
+            </label>
+            <label class="field">
+              <span>Your name</span>
+              <input id="name" required maxlength="32" autocomplete="nickname" placeholder="How the room should list you" />
+            </label>
+            <button type="submit" class="btn primary large">Join</button>
+          </form>
+          <p class="hint">
+            Testing alone? Open two tabs, join the same room, and send fixture A from one and
+            fixture B from the other.
+          </p>
+        </section>
+        <section class="proof" aria-labelledby="proof-heading">
+          <h2 id="proof-heading">Measured in the test suite</h2>
+          <p class="hint">
+            Two devices in one room, each hearing both voices. Figures from the core tests; re-run
+            them with <code>pnpm test</code>.
+          </p>
+          <table class="results">
+            <thead>
+              <tr>
+                <th scope="col">Case</th>
+                <th scope="col">Plain sum</th>
+                <th scope="col">Gain sharing</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Comb-filter ripple, two devices</th>
+                <td>5.74 dB</td>
+                <td>1.81 dB</td>
+              </tr>
+              <tr>
+                <th scope="row">Level change, identical streams</th>
+                <td>+6.02 dB</td>
+                <td>0.00 dB</td>
+              </tr>
+              <tr>
+                <th scope="row">Level change, eight noise sources</th>
+                <td>+8.8 dB</td>
+                <td>−8.9 dB</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
 
-      <section id="participants-card" class="card hidden">
-        <h2>Participants</h2>
-        <ul id="participants" class="participants"></ul>
-      </section>
-      <section id="monitor-card" class="card hidden">
-        <h2>Monitor</h2>
-        <p class="hint">
-          Use headphones. Playing the mix through speakers feeds it straight back into every
-          microphone in the room.
-        </p>
-        <div class="row">
-          <button id="play-toggle" class="big">Play mix</button>
-          <div class="meter grow" aria-label="Output level"><div id="output-meter" class="meter-fill"></div></div>
+      <div class="grid">
+        <div class="col">
+        <section id="session" class="panel hidden" aria-labelledby="input-heading">
+          <header class="panel-head split">
+            <h2 id="input-heading">Your input</h2>
+            <p class="where">In <strong id="session-room"></strong> as <strong id="session-name"></strong></p>
+          </header>
+          <label class="field">
+            <span>Input</span>
+            <select id="input-kind">
+              <option value="mic">Microphone</option>
+              <option value="fileA">Audio file: device A (Samantha near, Daniel far)</option>
+              <option value="fileB">Audio file: device B (Daniel near, Samantha far)</option>
+            </select>
+          </label>
+          <button id="mic-toggle" class="btn primary large" type="button">Start microphone</button>
+          <div class="meter" aria-label="Input level"><div id="input-meter" class="meter-fill"></div></div>
+          <p id="capture-info" class="hint"></p>
+        </section>
+
+        <section id="monitor-card" class="panel hidden" aria-labelledby="monitor-heading">
+          <header class="panel-head">
+            <h2 id="monitor-heading">Monitor</h2>
+            <p class="hint">
+              Use headphones. Through speakers, the mix feeds straight back into every microphone in
+              the room.
+            </p>
+          </header>
+          <div class="row">
+            <button id="play-toggle" class="btn large" type="button">Play mix</button>
+            <div class="meter grow" aria-label="Output level"><div id="output-meter" class="meter-fill"></div></div>
+          </div>
+          <p class="hint">
+            You hear exactly what the backend receives: the final mix, including your own microphone
+            about 150 ms late. For a natural listen, monitor from a device that is not recording.
+          </p>
+          <dl class="stats">
+            <div><dt>Dominant</dt><dd id="dominant">–</dd></div>
+            <div><dt>Playback buffer</dt><dd id="playback-buffer">–</dd></div>
+            <div><dt>Latency (estimate)</dt><dd id="latency">–</dd></div>
+            <div><dt>Playback underruns</dt><dd id="playback-underruns">0</dd></div>
+            <div><dt>Mixed frames</dt><dd id="sequence">0</dd></div>
+          </dl>
+          <label class="field">
+            <span>Mix strategy</span>
+            <select id="strategy">
+              <option value="gain-sharing">Gain sharing (default)</option>
+              <option value="plain-sum">Plain sum (baseline for comparison)</option>
+            </select>
+          </label>
+          <div class="row">
+            <button id="record-toggle" class="btn" type="button">Record mix</button>
+            <button id="recording-play" class="btn hidden" type="button">Play recording</button>
+            <a id="download" class="btn hidden" download="roommix.wav">Download WAV</a>
+            <span id="record-info" class="hint"></span>
+          </div>
+        </section>
         </div>
-        <p class="hint">
-          You hear exactly what the backend receives: the final mix, including your own
-          microphone about 150 ms late. For a natural listen, monitor from a device that is
-          not recording.
-        </p>
-        <dl class="stats">
-          <div><dt>Dominant</dt><dd id="dominant">–</dd></div>
-          <div><dt>Playback buffer</dt><dd id="playback-buffer">–</dd></div>
-          <div><dt>Latency (estimate)</dt><dd id="latency">–</dd></div>
-          <div><dt>Playback underruns</dt><dd id="playback-underruns">0</dd></div>
-          <div><dt>Mixed frames</dt><dd id="sequence">0</dd></div>
-        </dl>
-        <label>Mix strategy
-          <select id="strategy">
-            <option value="gain-sharing">Gain sharing (default)</option>
-            <option value="plain-sum">Plain sum (baseline for comparison)</option>
-          </select>
-        </label>
-        <div class="row">
-          <button id="record-toggle">Record mix</button>
-          <button id="recording-play" class="hidden">Play recording</button>
-          <a id="download" class="button hidden" download="roommix.wav">Download WAV</a>
-          <span id="record-info" class="hint"></span>
+
+        <div class="col">
+        <section id="participants-card" class="panel hidden" aria-labelledby="participants-heading">
+          <header class="panel-head">
+            <h2 id="participants-heading">Participants</h2>
+            <p class="hint">Every device in the room, weighted live by how much it is speaking.</p>
+          </header>
+          <div class="share">
+            <div class="share-head">
+              <span>Gain share</span>
+              <span id="gain-share-caption" class="hint"></span>
+            </div>
+            <div id="gain-share" class="share-bar" aria-label="Gain share"></div>
+          </div>
+          <ul id="participants" class="participants"></ul>
+        </section>
+
+        <section id="network-card" class="panel hidden" aria-labelledby="network-heading">
+          <header class="panel-head">
+            <h2 id="network-heading">Network simulation</h2>
+            <p class="hint">Applied to this device's outgoing audio only.</p>
+          </header>
+          <label class="range">
+            <span class="range-head"><span>Added delay</span><output id="delay-value">0 ms</output></span>
+            <input id="delay" type="range" min="0" max="1000" step="10" value="0" />
+          </label>
+          <label class="range">
+            <span class="range-head"><span>Jitter</span><output id="jitter-value">0 ms</output></span>
+            <input id="jitter" type="range" min="0" max="300" step="5" value="0" />
+          </label>
+          <label class="range">
+            <span class="range-head"><span>Dropped chunks</span><output id="drop-value">0 %</output></span>
+            <input id="drop" type="range" min="0" max="50" step="1" value="0" />
+          </label>
+        </section>
         </div>
-      </section>
-      <section id="network-card" class="card hidden">
-        <h2>Network simulation</h2>
-        <p class="hint">Applied to this device's outgoing audio only.</p>
-        <label>Added delay <output id="delay-value">0 ms</output>
-          <input id="delay" type="range" min="0" max="1000" step="10" value="0" /></label>
-        <label>Jitter <output id="jitter-value">0 ms</output>
-          <input id="jitter" type="range" min="0" max="300" step="5" value="0" /></label>
-        <label>Dropped chunks <output id="drop-value">0 %</output>
-          <input id="drop" type="range" min="0" max="50" step="1" value="0" /></label>
-      </section>
+      </div>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

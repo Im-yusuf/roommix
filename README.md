@@ -81,6 +81,12 @@ front of it (any reverse proxy or ingress) when deploying.
 
 ## What the simulator shows
 
+- **Lobby**: what the service does in one sentence, the join form, and the
+  figures measured in the test suite (comb ripple and level change with plain
+  sum versus gain sharing), so the mechanism is visible before anything plays.
+- **Gain share**: one bar split between the devices in the room. With gain
+  sharing it always adds up to 100 % and re-balances as the dominant device
+  changes; with plain sum the caption says what the gains add up to instead.
 - **Participants**: name, state (`joining`, `live`, `stalled`, `idle`, `left`),
   live level meter, current gain, jitter buffer depth, underruns and drops. The
   dominant source is highlighted.

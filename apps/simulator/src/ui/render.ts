@@ -3,6 +3,9 @@ import type { AppState } from '../state.js';
 import { $ } from './dom.js';
 
 const INPUT_LABELS = { mic: 'microphone', fileA: 'file A', fileB: 'file B' } as const;
+const FACT_KEYS = ['gain', 'buffer', 'underruns', 'drops', 'skipped'] as const;
+
+type FactKey = (typeof FACT_KEYS)[number];
 
 /** Maps an RMS level to a meter width: -60 dBFS is empty, 0 dBFS is full. */
 export function levelToPercent(rms: number): number {
@@ -11,9 +14,36 @@ export function levelToPercent(rms: number): number {
   return Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
 }
 
+/** The fill stays full width and is clipped to the level, so a meter never re-lays out. */
+function setMeter(fill: HTMLElement, rms: number): void {
+  fill.style.clipPath = `inset(0 ${100 - levelToPercent(rms)}% 0 0 round 999px)`;
+}
+
+/** One participant row, kept between renders so meters and gains animate in place. */
+interface Row {
+  li: HTMLLIElement;
+  name: HTMLElement;
+  state: HTMLElement;
+  stateText: Text;
+  dominantTag: HTMLElement;
+  fill: HTMLElement;
+  values: Record<FactKey, HTMLElement>;
+  skippedFact: HTMLElement;
+}
+
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className: string,
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  node.className = className;
+  return node;
+}
+
 /**
  * The page is static HTML; rendering means updating the handful of nodes that
- * show state. The participant list is the only part rebuilt wholesale.
+ * show state. Participant rows and gain-share segments are keyed by client so
+ * their widths can transition instead of being rebuilt ten times a second.
  */
 export function createRenderer() {
   const connection = $('connection');
@@ -31,6 +61,8 @@ export function createRenderer() {
   const captureInfo = $('capture-info');
   const participantsCard = $('participants-card');
   const participants = $<HTMLUListElement>('participants');
+  const gainShare = $('gain-share');
+  const gainShareCaption = $('gain-share-caption');
   const monitorCard = $('monitor-card');
   const playToggle = $<HTMLButtonElement>('play-toggle');
   const outputMeter = $('output-meter');
@@ -51,10 +83,77 @@ export function createRenderer() {
     dropPercent: { input: $<HTMLInputElement>('drop'), output: $('drop-value'), unit: '%' },
   } as const;
 
+  const rows = new Map<string, Row>();
+  const segments = new Map<string, HTMLElement>();
   let renderedRoster: RosterEntry[] | null = null;
   let renderedDominant: string | null = null;
+  let renderedStrategy: AppState['strategy'] | null = null;
+
+  function syncParticipants(state: AppState): void {
+    const seen = new Set<string>();
+    state.roster.forEach((entry, index) => {
+      seen.add(entry.clientId);
+      let row = rows.get(entry.clientId);
+      if (!row) {
+        row = createRow();
+        rows.set(entry.clientId, row);
+      }
+      updateRow(row, entry, entry.clientId === state.dominant, entry.clientId === state.clientId);
+      if (participants.children[index] !== row.li)
+        participants.insertBefore(row.li, participants.children[index] ?? null);
+    });
+    for (const [clientId, row] of rows) {
+      if (seen.has(clientId)) continue;
+      row.li.remove();
+      rows.delete(clientId);
+    }
+  }
+
+  function syncGainShare(state: AppState): void {
+    const total = state.roster.reduce((sum, entry) => sum + entry.gain, 0);
+    // Gain sharing sums to one and fills the bar exactly; plain sum exceeds it and is scaled down.
+    const scale = Math.max(1, total);
+    const seen = new Set<string>();
+    const tracks: string[] = [];
+    let index = 0;
+    for (const entry of state.roster) {
+      if (entry.gain < 0.005) continue;
+      seen.add(entry.clientId);
+      tracks.push(`minmax(0, ${entry.gain / scale}fr)`);
+      let segment = segments.get(entry.clientId);
+      if (!segment) {
+        segment = el('div', 'seg');
+        segment.append(el('span', 'seg-name'));
+        segments.set(entry.clientId, segment);
+      }
+      const percent = Math.round(entry.gain * 100);
+      // The visible name hides below a readable width; the title and label keep it.
+      (segment.firstChild as HTMLElement).textContent = entry.name;
+      segment.title = `${entry.name}: gain ${percent} %`;
+      segment.setAttribute('aria-label', `${entry.name}: gain ${percent} %`);
+      segment.classList.toggle('dominant', entry.clientId === state.dominant);
+      if (gainShare.children[index] !== segment)
+        gainShare.insertBefore(segment, gainShare.children[index] ?? null);
+      index += 1;
+    }
+    for (const [clientId, segment] of segments) {
+      if (seen.has(clientId)) continue;
+      segment.remove();
+      segments.delete(clientId);
+    }
+    gainShare.style.gridTemplateColumns = tracks.join(' ');
+    gainShareCaption.textContent =
+      state.roster.length === 0
+        ? 'waiting for the roster'
+        : total < 0.005
+          ? 'no device is sending audio'
+          : state.strategy === 'plain-sum'
+            ? `adds up to ${Math.round(total * 100)} %: plain sum keeps every device at full gain`
+            : `adds up to ${Math.round(total * 100)} %`;
+  }
 
   return function render(state: AppState): void {
+    document.body.dataset.phase = state.phase;
     connection.textContent = state.connection;
     connection.className = `pill ${state.connection}`;
 
@@ -88,28 +187,26 @@ export function createRenderer() {
           : state.mic === 'paused'
             ? `Paused · stop ${input}`
             : `Stop ${input}`;
-    inputMeter.style.width = `${levelToPercent(state.inputLevel)}%`;
+    setMeter(inputMeter, state.inputLevel);
     captureInfo.textContent = state.captureRate
       ? `Sending ${state.captureRate} Hz PCM16 in 20 ms chunks; the server resamples to 16 kHz.`
       : '';
 
-    if (state.roster !== renderedRoster || state.dominant !== renderedDominant) {
+    if (
+      state.roster !== renderedRoster ||
+      state.dominant !== renderedDominant ||
+      state.strategy !== renderedStrategy
+    ) {
       renderedRoster = state.roster;
       renderedDominant = state.dominant;
-      participants.replaceChildren(
-        ...state.roster.map((entry) =>
-          participantRow(
-            entry,
-            entry.clientId === state.dominant,
-            entry.clientId === state.clientId,
-          ),
-        ),
-      );
+      renderedStrategy = state.strategy;
+      syncParticipants(state);
+      syncGainShare(state);
     }
 
     playToggle.textContent = state.monitor.playing ? 'Stop playback' : 'Play mix';
     playToggle.classList.toggle('active', state.monitor.playing);
-    outputMeter.style.width = `${levelToPercent(state.monitor.outputLevel)}%`;
+    setMeter(outputMeter, state.monitor.outputLevel);
     dominant.textContent = state.roster.find((p) => p.clientId === state.dominant)?.name ?? '–';
     playbackBuffer.textContent = state.monitor.playing
       ? `${Math.round(state.monitor.bufferMs)} ms`
@@ -150,40 +247,51 @@ export function createRenderer() {
   };
 }
 
-function participantRow(entry: RosterEntry, isDominant: boolean, isSelf: boolean): HTMLLIElement {
-  const li = document.createElement('li');
-  li.className = isDominant ? 'participant dominant' : 'participant';
+function createRow(): Row {
+  const li = el('li', 'participant');
+  const who = el('div', 'who');
+  const name = el('span', 'name');
+  const state = el('span', 'state');
+  const stateText = document.createTextNode('');
+  const dominantTag = el('b', 'dominant-tag');
+  dominantTag.textContent = 'dominant';
+  state.append(el('i', 'dot'), stateText, dominantTag);
+  who.append(name, state);
 
-  const name = document.createElement('span');
-  name.className = 'name';
-  name.textContent = isSelf ? `${entry.name} (you)` : entry.name;
-
-  const state = document.createElement('span');
-  state.className = `state ${entry.state}`;
-  state.textContent = isDominant ? `${entry.state} · dominant` : entry.state;
-
-  const meter = document.createElement('div');
-  meter.className = 'meter';
-  const fill = document.createElement('div');
-  fill.className = 'meter-fill';
-  fill.style.width = `${levelToPercent(entry.level)}%`;
+  const meter = el('div', 'meter');
+  meter.setAttribute('aria-label', 'Level');
+  const fill = el('div', 'meter-fill');
   meter.append(fill);
 
-  const details = document.createElement('div');
-  details.className = 'details';
-  const facts = [
-    `gain ${Math.round(entry.gain * 100)} %`,
-    `buffer ${entry.bufferMs} ms`,
-    `underruns ${entry.underruns}`,
-    `drops ${entry.drops}`,
-  ];
-  if (entry.skipped > 0) facts.push(`skipped ${entry.skipped}`);
-  for (const fact of facts) {
-    const span = document.createElement('span');
-    span.textContent = fact;
-    details.append(span);
+  const details = el('div', 'details');
+  const values = {} as Record<FactKey, HTMLElement>;
+  const facts = {} as Record<FactKey, HTMLElement>;
+  for (const key of FACT_KEYS) {
+    const fact = el('span', 'fact');
+    const label = el('span', 'k');
+    label.textContent = key;
+    const value = el('span', 'v');
+    fact.append(label, value);
+    details.append(fact);
+    values[key] = value;
+    facts[key] = fact;
   }
 
-  li.append(name, state, meter, details);
-  return li;
+  li.append(who, meter, details);
+  return { li, name, state, stateText, dominantTag, fill, values, skippedFact: facts.skipped };
+}
+
+function updateRow(row: Row, entry: RosterEntry, isDominant: boolean, isSelf: boolean): void {
+  row.li.classList.toggle('dominant', isDominant);
+  row.name.textContent = isSelf ? `${entry.name} (you)` : entry.name;
+  row.state.className = `state ${entry.state}`;
+  row.stateText.data = entry.state;
+  row.dominantTag.classList.toggle('hidden', !isDominant);
+  setMeter(row.fill, entry.level);
+  row.values.gain.textContent = `${Math.round(entry.gain * 100)} %`;
+  row.values.buffer.textContent = `${entry.bufferMs} ms`;
+  row.values.underruns.textContent = String(entry.underruns);
+  row.values.drops.textContent = String(entry.drops);
+  row.values.skipped.textContent = String(entry.skipped);
+  row.skippedFact.classList.toggle('hidden', entry.skipped === 0);
 }
