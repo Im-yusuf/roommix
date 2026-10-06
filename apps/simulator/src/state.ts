@@ -2,6 +2,7 @@ import type { StrategyName } from '@roommix/core';
 import type { RosterEntry } from '@roommix/server/protocol';
 import type { InputKind } from './audio/capture.js';
 import type { ConnectionStatus } from './client.js';
+import type { NetworkSettings } from './net-sim.js';
 
 export type MicStatus = 'off' | 'starting' | 'on' | 'paused';
 
@@ -36,6 +37,7 @@ export interface AppState {
     recordedMs: number;
     downloadUrl: string | null;
   };
+  net: NetworkSettings;
   notice: Notice | null;
 }
 
@@ -63,6 +65,7 @@ export const initialState: AppState = {
     recordedMs: 0,
     downloadUrl: null,
   },
+  net: { delayMs: 0, jitterMs: 0, dropPercent: 0 },
   notice: null,
 };
 

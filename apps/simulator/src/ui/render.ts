@@ -44,6 +44,12 @@ export function createRenderer() {
   const download = $<HTMLAnchorElement>('download');
   const recordingPlay = $<HTMLButtonElement>('recording-play');
   const recordInfo = $('record-info');
+  const networkCard = $('network-card');
+  const ranges = {
+    delayMs: { input: $<HTMLInputElement>('delay'), output: $('delay-value'), unit: 'ms' },
+    jitterMs: { input: $<HTMLInputElement>('jitter'), output: $('jitter-value'), unit: 'ms' },
+    dropPercent: { input: $<HTMLInputElement>('drop'), output: $('drop-value'), unit: '%' },
+  } as const;
 
   let renderedRoster: RosterEntry[] | null = null;
   let renderedDominant: string | null = null;
@@ -64,7 +70,7 @@ export function createRenderer() {
 
     const joined = state.phase === 'joined';
     lobby.classList.toggle('hidden', joined);
-    for (const card of [session, participantsCard, monitorCard])
+    for (const card of [session, participantsCard, monitorCard, networkCard])
       card.classList.toggle('hidden', !joined);
     leave.classList.toggle('hidden', !joined);
     sessionRoom.textContent = state.room;
@@ -135,6 +141,12 @@ export function createRenderer() {
       !state.monitor.recording && state.monitor.downloadUrl
         ? `${(state.monitor.recordedMs / 1000).toFixed(1)} s of 16 kHz mono WAV`
         : '';
+
+    for (const [key, { input: range, output, unit }] of Object.entries(ranges)) {
+      const value = state.net[key as keyof typeof ranges];
+      if (Number(range.value) !== value) range.value = String(value);
+      output.textContent = `${value} ${unit}`;
+    }
   };
 }
 

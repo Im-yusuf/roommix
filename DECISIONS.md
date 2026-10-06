@@ -233,6 +233,10 @@ Browser AGC would fight the mixer's own level tracking; noise suppression lowers
 the floor the tracker sees; echo cancellation is the browser default and helps
 when the monitor plays through speakers anyway.
 
+**Network simulation on the uplink.** Delay, jitter and drop are applied to
+this client's outgoing chunks, in order, so the jitter buffer, stall handling
+and underrun counters can be exercised without a bad network.
+
 ## Testing
 
 **A simulation harness drives every integration test.** `simulate()` in the test helpers feeds the mixer with a fake clock: every 20 ms each live source renders exactly the audio covering that interval at its own rate (with an optional clock error), chunks arrive after an optional seeded network delay, sources join, stall and leave at given times, and the mixer ticks once. Thirty simulated minutes run in about a second, and every quality and timing test is a few lines on top of it.

@@ -32,3 +32,12 @@ $<HTMLSelectElement>('strategy').onchange = (event) => {
   app.setStrategy((event.target as HTMLSelectElement).value as StrategyName);
 };
 $('notice-dismiss').onclick = () => app.dismissNotice();
+
+const bindRange = (id: string, key: 'delayMs' | 'jitterMs' | 'dropPercent') => {
+  $<HTMLInputElement>(id).oninput = (event) => {
+    app.setNetwork({ [key]: Number((event.target as HTMLInputElement).value) });
+  };
+};
+bindRange('delay', 'delayMs');
+bindRange('jitter', 'jitterMs');
+bindRange('drop', 'dropPercent');

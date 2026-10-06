@@ -88,6 +88,16 @@
           <span id="record-info" class="hint"></span>
         </div>
       </section>
+      <section id="network-card" class="card hidden">
+        <h2>Network simulation</h2>
+        <p class="hint">Applied to this device's outgoing audio only.</p>
+        <label>Added delay <output id="delay-value">0 ms</output>
+          <input id="delay" type="range" min="0" max="1000" step="10" value="0" /></label>
+        <label>Jitter <output id="jitter-value">0 ms</output>
+          <input id="jitter" type="range" min="0" max="300" step="5" value="0" /></label>
+        <label>Dropped chunks <output id="drop-value">0 %</output>
+          <input id="drop" type="range" min="0" max="50" step="1" value="0" /></label>
+      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

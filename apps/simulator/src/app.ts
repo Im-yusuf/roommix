@@ -4,6 +4,7 @@ import { type Capture, CaptureError, type InputKind, startCapture } from './audi
 import { type Playback, startPlayback } from './audio/playback.js';
 import { createRecorder } from './audio/recorder.js';
 import { createClient } from './client.js';
+import { createNetworkSimulator, type NetworkSettings } from './net-sim.js';
 import type { Notice, Store } from './state.js';
 
 const RECONNECT_PREFIX = 'Connection lost.';
@@ -18,6 +19,10 @@ export function createApp(store: Store) {
     frame: onFrame,
   });
 
+  // Chunks the simulator held back must not arrive after the source stopped: the server would reject them.
+  const net = createNetworkSimulator((pcm) => {
+    if (audioReady) client.sendAudio(pcm);
+  });
   let capture: Capture | null = null;
   let playback: Playback | null = null;
   const recorder = createRecorder();
@@ -135,7 +140,7 @@ export function createApp(store: Store) {
     try {
       capture = await startCapture(store.state.inputKind, {
         chunk: (pcm) => {
-          if (audioReady) client.sendAudio(pcm);
+          if (audioReady) net.push(pcm);
         },
         level: (rms) => store.update({ inputLevel: rms }),
         paused: (reason) => {
@@ -274,6 +279,11 @@ export function createApp(store: Store) {
     store.update({ strategy: name });
   }
 
+  function setNetwork(changes: Partial<NetworkSettings>): void {
+    net.configure(changes);
+    store.update({ net: net.settings });
+  }
+
   return {
     join,
     leave,
@@ -283,6 +293,7 @@ export function createApp(store: Store) {
     toggleRecording,
     toggleRecordingPlayback,
     setStrategy,
+    setNetwork,
     dismissNotice: () => notify(null),
   };
 }
