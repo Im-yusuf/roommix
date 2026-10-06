@@ -152,6 +152,14 @@ re-anchors its clock when someone arrives, so there is no burst of owed frames
 and no silent stream to nowhere. Frame sequence numbers continue, so a
 consumer can see the gap.
 
+**Reconnect with the same id replaces the old connection.** The old socket is
+told `replaced` and closed; its source is removed; the new connection joins
+clean. The simulator keeps the id in `sessionStorage`, which is per tab, so two
+tabs are two participants but a reload or a network drop is the same one.
+
+**Last leave tears the room down; rooms hold at most 8.** Timers stop, memory
+goes; the cap keeps CPU and fan-out bounded per room.
+
 ## Server
 
 **Raw PCM16 in binary frames, JSON in text frames.** No per-chunk header:
@@ -160,6 +168,15 @@ in the roster. The codec question (Opus) is answered by the transport swap, not
 by a header format.
 
 **Rooms talk to clients only through `Connection` and `Transport`.** The interfaces come first, with an in-memory fake for tests, so room and session logic is written and tested without a socket in sight. A WebSocket adapter, a WebRTC data channel or any other ordered byte pipe plugs in behind them.
+
+**Roster at 10 Hz, not per frame.** The UI needs about 10 updates a second;
+per-frame metadata would be 50 messages a second to every client.
+
+**A client's first message is always its own `joined`.** Nothing is broadcast ad hoc on join, leave or strategy change; the next 100 ms roster carries it. Clients can therefore treat the first text frame as the acknowledgement and never see a roster for a room they do not know they are in.
+
+**Slow subscribers skip frames.** Once a subscriber's socket has more than
+64 KB (about 2 s) queued, frames are skipped for that subscriber and counted.
+The mixer never waits, and 2 s of lag is already useless for a live monitor.
 
 ## Testing
 
@@ -195,15 +212,15 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | browsers ignoring the requested rate | pending |
 | arbitrary chunk sizes, including 128 samples | tests: *resampler > is identical whether fed in one chunk or in arbitrary small chunks* (1, 7, 128, 333, 960, 4000); *mixer api > validates sources and chunks* pushes 128 samples |
 | late joiner | test: *timing > a late joiner is heard within the jitter target and disturbs nothing* |
-| slow subscriber | pending |
+| slow subscriber | test: *rooms and sessions > skips frames for a slow subscriber instead of holding up the mixer*; decision: bounded by buffered bytes, frames skipped and counted |
 | tab closed without leaving | pending |
 | stalled vs genuinely silent | test: *source state machine > goes joining -> live -> stalled -> live -> left*; decision: the state looks only at arrivals |
-| reconnect with the same id | pending |
+| reconnect with the same id | test: *rooms and sessions > replaces the earlier connection when the same client id reconnects* |
 | zero sources | test: *mixer api > idles with no sources and emits one frame per 20 ms once a source exists* |
 | one source | test: *mix quality > passes a single source through at unity* |
-| last leave tears the room down | pending |
-| room size cap | pending |
-| malformed payloads | tests: *pcm > rejects an odd byte length*; *mixer api > validates sources and chunks* (odd byte length, oversize, NaN and fractional rates); the server's own row lands with it |
+| last leave tears the room down | test: *rooms and sessions > tears the room down when the last participant leaves or drops* (timers gone too) |
+| room size cap | test: *rooms and sessions > refuses a join beyond the room size* |
+| malformed payloads | tests: *pcm > rejects an odd byte length*; *mixer api > validates sources and chunks* (odd byte length, oversize, NaN and fractional rates); *protocol > describes what is wrong with malformed messages*; *rooms and sessions > answers malformed traffic with error messages and stays up* |
 | host process stalls | test: *mixer api > skips ahead instead of bursting after a long host stall* |
 | mic permission denied | pending |
 | input device changed mid-session | pending |
