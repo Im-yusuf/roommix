@@ -178,6 +178,21 @@ per-frame metadata would be 50 messages a second to every client.
 64 KB (about 2 s) queued, frames are skipped for that subscriber and counted.
 The mixer never waits, and 2 s of lag is already useless for a live monitor.
 
+**WebSocket with `ws`, 60 lines behind the transport interface.** Alternatives: Socket.IO (heavier, its own framing), WebRTC (left out, see below). Binary frames, ordered delivery, TLS-friendly and native in every browser.
+
+**Liveness belongs to the transport.** The adapter pings every 5 s and
+terminates a peer that misses two pongs. Browsers answer protocol pings
+automatically, so a tab closed without leaving, a phone that lost the network
+or went to sleep is removed within 10 s. A peer that stays connected but sends
+no audio stays in the room as `stalled` and contributes silence.
+
+**Plain HTTP in production, self-signed HTTPS in development.** TLS termination
+is the ingress's job in any deployment; for phones on a laptop, the Vite dev
+server offers a self-signed certificate.
+
+**The server serves the built simulator.** One process is the whole
+deployment, which keeps the Dockerfile and the quick start short.
+
 ## Testing
 
 **A simulation harness drives every integration test.** `simulate()` in the test helpers feeds the mixer with a fake clock: every 20 ms each live source renders exactly the audio covering that interval at its own rate (with an optional clock error), chunks arrive after an optional seeded network delay, sources join, stall and leave at given times, and the mixer ticks once. Thirty simulated minutes run in about a second, and every quality and timing test is a few lines on top of it.
@@ -213,7 +228,7 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | arbitrary chunk sizes, including 128 samples | tests: *resampler > is identical whether fed in one chunk or in arbitrary small chunks* (1, 7, 128, 333, 960, 4000); *mixer api > validates sources and chunks* pushes 128 samples |
 | late joiner | test: *timing > a late joiner is heard within the jitter target and disturbs nothing* |
 | slow subscriber | test: *rooms and sessions > skips frames for a slow subscriber instead of holding up the mixer*; decision: bounded by buffered bytes, frames skipped and counted |
-| tab closed without leaving | pending |
+| tab closed without leaving | tests: *websocket transport > terminates a peer that stops answering pings*; *rooms and sessions > tears the room down when the last participant leaves or drops*; removal fades the source out |
 | stalled vs genuinely silent | test: *source state machine > goes joining -> live -> stalled -> live -> left*; decision: the state looks only at arrivals |
 | reconnect with the same id | test: *rooms and sessions > replaces the earlier connection when the same client id reconnects* |
 | zero sources | test: *mixer api > idles with no sources and emits one frame per 20 ms once a source exists* |

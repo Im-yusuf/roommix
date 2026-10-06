@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "WebSocket adapter for @roommix/core: rooms, one mixer per room, mixed stream fan-out.",
   "type": "module",
+  "bin": {
+    "roommix-server": "./dist/main.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -18,9 +21,15 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch --tsconfig tsconfig.json src/main.ts",
+    "start": "node dist/main.js"
   },
   "dependencies": {
-    "@roommix/core": "workspace:*"
+    "@roommix/core": "workspace:*",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
   }
 }

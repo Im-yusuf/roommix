@@ -16,7 +16,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "mix": "tsx --tsconfig packages/cli/tsconfig.json packages/cli/src/cli.ts"
+    "mix": "tsx --tsconfig packages/cli/tsconfig.json packages/cli/src/cli.ts",
+    "dev": "pnpm -r --parallel dev",
+    "start": "node packages/server/dist/main.js"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
