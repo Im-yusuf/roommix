@@ -52,6 +52,43 @@ stream's last ~1.7 ms is held until more input arrives.
 
 **Level meter: RMS with a 10 ms attack and a 300 ms release; noise floor as a minimum follower that rises at most 3 dB/s, capped at −30 dBFS.** The fast attack lets the gain shares follow speech onsets within a frame; the slow release is what stops two equal talkers from fluttering. Pauses in speech reset the floor at once; speech itself cannot become the floor; a loud steady signal cannot mute itself. Activity, the quantity the mixer shares, is level above this floor.
 
+## Timing
+
+**Per-source jitter buffer, 60 ms target, 200 ms maximum.** Play-out starts
+once 60 ms is queued, which absorbs arrival jitter below that; anything over
+200 ms (a burst after a stall) is trimmed back to target so latency stays
+bounded. 60 ms is a small fraction of the speech-to-translation budget. An
+adaptive target (grow with observed jitter) was left out; it would be a few
+lines in the same window logic.
+
+**Refill to target after a gap.** When the buffer runs dry it waits for a full
+target before resuming, so one late packet does not turn into a run of tiny
+gaps and dips.
+
+**One rule for clicks: fade at every seam.** The frame before a gap is faded
+out (the buffer knows a gap is coming because nothing follows that frame) and
+the first frame after a gap, drop or repeat is faded in; 3 ms linear ramps.
+Alternatives: packet loss concealment (repeat or extrapolate the last frame),
+crossfades. Fades are free, need no lookahead delay, and the test suite shows
+no sample step above 1.5× the signal's own slope through join, stall, burst,
+leave and gain changes. Concealment would hide short gaps better but adds
+artefacts and state; it is the obvious next step if gaps prove audible.
+
+**Drift: watch the trend, correct at quiet moments.** Every 10 s the buffer
+checks the shallowest and deepest it got. If it never fell to target, a frame
+of surplus has accumulated: drop one. If it never reached target, it is running
+dry: repeat one. Corrections wait for a frame below the noise floor plus 6 dB,
+and act anyway after 5 s. Alternative: adaptive resampling (nudge the ratio by
+the measured ppm). Dropping and repeating is simpler, inaudible in pauses, and
+needs no extra DSP; at ±200 ppm it is one frame every 100 s. The resampler
+already takes any ratio, so adaptive resampling would replace only the
+correction step.
+
+**Overrun is trimmed at push time.** Bursts arrive after stalls, and after a
+stall the last played frame already ended in a fade, so trimming the queue as
+it fills is click-free in practice and keeps memory bounded. Gradual growth
+never reaches the limit because the drift logic acts first.
+
 ## Edge cases, one by one
 
 Every edge case from the brief, with the test that covers it or the decision
