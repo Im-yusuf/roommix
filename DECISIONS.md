@@ -146,6 +146,10 @@ re-anchors its clock when someone arrives, so there is no burst of owed frames
 and no silent stream to nowhere. Frame sequence numbers continue, so a
 consumer can see the gap.
 
+## Testing
+
+**A simulation harness drives every integration test.** `simulate()` in the test helpers feeds the mixer with a fake clock: every 20 ms each live source renders exactly the audio covering that interval at its own rate (with an optional clock error), chunks arrive after an optional seeded network delay, sources join, stall and leave at given times, and the mixer ticks once. Thirty simulated minutes run in about a second, and every quality and timing test is a few lines on top of it.
+
 ## Edge cases, one by one
 
 Every edge case from the brief, with the test that covers it or the decision
