@@ -1,2 +1,3 @@
-// The public API is assembled here as each piece lands.
-export {};
+export * from './constants.js';
+export { MixerError, type MixerErrorCode } from './errors.js';
+export type * from './types.js';
