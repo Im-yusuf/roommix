@@ -2,7 +2,7 @@ import type { RosterEntry } from '@roommix/server/protocol';
 import type { AppState } from '../state.js';
 import { $ } from './dom.js';
 
-const INPUT_LABELS = { fileA: 'file A', fileB: 'file B' } as const;
+const INPUT_LABELS = { mic: 'microphone', fileA: 'file A', fileB: 'file B' } as const;
 
 /** Maps an RMS level to a meter width: -60 dBFS is empty, 0 dBFS is full. */
 export function levelToPercent(rms: number): number {

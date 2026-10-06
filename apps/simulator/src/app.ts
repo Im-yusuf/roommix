@@ -1,6 +1,6 @@
 import type { StrategyName } from '@roommix/core';
 import type { ServerMessage } from '@roommix/server/protocol';
-import { type Capture, type InputKind, startCapture } from './audio/capture.js';
+import { type Capture, CaptureError, type InputKind, startCapture } from './audio/capture.js';
 import { type Playback, startPlayback } from './audio/playback.js';
 import { createRecorder } from './audio/recorder.js';
 import { createClient } from './client.js';
@@ -147,6 +147,14 @@ export function createApp(store: Store) {
           store.update({ mic: 'on' });
           notify(null);
         },
+        ended: (reason) => {
+          void stopInput();
+          notify({
+            tone: 'error',
+            message: reason,
+            action: { label: 'Try again', run: () => void startInput() },
+          });
+        },
       });
       store.update({ mic: 'on', captureRate: capture.sampleRate });
       client.send({ type: 'start', sampleRate: capture.sampleRate });
@@ -154,10 +162,19 @@ export function createApp(store: Store) {
     } catch (error) {
       capture = null;
       store.update({ mic: 'off' });
+      const retryable = !(error instanceof CaptureError) || error.retryable;
       notify({
         tone: 'error',
         message: error instanceof Error ? error.message : String(error),
-        action: { label: 'Try again', run: () => void startInput() },
+        action: retryable
+          ? { label: 'Try again', run: () => void startInput() }
+          : {
+              label: 'Use audio file A instead',
+              run: () => {
+                setInputKind('fileA');
+                void startInput();
+              },
+            },
       });
     }
   }

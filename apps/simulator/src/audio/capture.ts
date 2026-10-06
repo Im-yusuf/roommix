@@ -2,13 +2,14 @@ import deviceAUrl from '../../../../fixtures/deviceA.wav?url';
 import deviceBUrl from '../../../../fixtures/deviceB.wav?url';
 import captureWorkletUrl from './worklets/capture-processor.ts?worker&url';
 
-export type InputKind = 'fileA' | 'fileB';
+export type InputKind = 'mic' | 'fileA' | 'fileB';
 
 export interface CaptureHandlers {
   chunk(pcm: Int16Array): void;
   level(rms: number): void;
   paused(reason: string): void;
   resumed(): void;
+  ended(reason: string): void;
 }
 
 export interface Capture {
@@ -17,12 +18,25 @@ export interface Capture {
   stop(): Promise<void>;
 }
 
-const FILE_URLS: Record<InputKind, string> = { fileA: deviceAUrl, fileB: deviceBUrl };
+export class CaptureError extends Error {
+  constructor(
+    message: string,
+    /** False when retrying cannot help (no secure context, no getUserMedia). */
+    readonly retryable = true,
+  ) {
+    super(message);
+  }
+}
+
+const FILE_URLS: Record<Exclude<InputKind, 'mic'>, string> = {
+  fileA: deviceAUrl,
+  fileB: deviceBUrl,
+};
 
 /**
- * Plays a looping fixture clip, standing in for a microphone, through an
- * AudioWorklet that produces 20 ms PCM16 chunks. Must be called from a user
- * gesture so the AudioContext may start.
+ * Captures the microphone, or a looping fixture file standing in for one,
+ * through an AudioWorklet that produces 20 ms PCM16 chunks. Must be called
+ * from a user gesture so the AudioContext may start.
  */
 export async function startCapture(kind: InputKind, handlers: CaptureHandlers): Promise<Capture> {
   const context = new AudioContext();
@@ -40,14 +54,30 @@ export async function startCapture(kind: InputKind, handlers: CaptureHandlers): 
     };
     tap.connect(context.destination); // keeps the node processing; it outputs silence
 
-    const response = await fetch(FILE_URLS[kind]);
-    const buffer = await context.decodeAudioData(await response.arrayBuffer());
-    const player = context.createBufferSource();
-    player.buffer = buffer;
-    player.loop = true;
-    player.start();
-    player.connect(tap);
-    cleanups.push(() => player.stop());
+    let source: AudioNode;
+    if (kind === 'mic') {
+      const stream = await getMicrophone();
+      const track = stream.getAudioTracks()[0];
+      track.addEventListener('ended', () => handlers.ended('Your microphone was disconnected.'));
+      track.addEventListener('mute', () =>
+        handlers.paused(
+          'Capture is paused: the system took the microphone (call, lock screen or another app).',
+        ),
+      );
+      track.addEventListener('unmute', () => handlers.resumed());
+      source = context.createMediaStreamSource(stream);
+      cleanups.push(() => track.stop());
+    } else {
+      const response = await fetch(FILE_URLS[kind]);
+      const buffer = await context.decodeAudioData(await response.arrayBuffer());
+      const player = context.createBufferSource();
+      player.buffer = buffer;
+      player.loop = true;
+      player.start();
+      source = player;
+      cleanups.push(() => player.stop());
+    }
+    source.connect(tap);
 
     // Phones suspend audio when the screen locks or the tab is hidden; come back with the tab.
     const onVisible = () => {
@@ -67,7 +97,7 @@ export async function startCapture(kind: InputKind, handlers: CaptureHandlers): 
       sampleRate: context.sampleRate,
       async stop() {
         for (const cleanup of cleanups) cleanup();
-        player.disconnect();
+        source.disconnect();
         tap.disconnect();
         tap.port.close();
         await context.close();
@@ -76,6 +106,50 @@ export async function startCapture(kind: InputKind, handlers: CaptureHandlers): 
   } catch (error) {
     for (const cleanup of cleanups) cleanup();
     await context.close();
-    throw error instanceof Error ? error : new Error('Audio capture could not start.');
+    throw toCaptureError(error);
+  }
+}
+
+async function getMicrophone(): Promise<MediaStream> {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new CaptureError(
+      'Microphone capture needs a secure page: open the simulator over HTTPS or on localhost. You can still use an audio file as your input.',
+      false,
+    );
+  }
+  // Automatic gain control would fight the mixer's own level tracking; noise suppression helps it.
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      channelCount: 1,
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: false,
+    },
+  });
+}
+
+function toCaptureError(error: unknown): CaptureError {
+  if (error instanceof CaptureError) return error;
+  const name = error instanceof DOMException ? error.name : '';
+  switch (name) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return new CaptureError(
+        'Microphone access was blocked. Allow the microphone for this site in your browser settings, then try again.',
+      );
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return new CaptureError(
+        'No microphone was found. Plug one in, or use an audio file as your input.',
+      );
+    case 'NotReadableError':
+    case 'AbortError':
+      return new CaptureError(
+        'The microphone could not be started. Another app may be using it; close it and try again.',
+      );
+    default:
+      return new CaptureError(
+        error instanceof Error ? error.message : 'Audio capture could not start.',
+      );
   }
 }

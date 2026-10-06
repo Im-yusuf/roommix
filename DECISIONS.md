@@ -228,6 +228,11 @@ microphone about 150 ms late. The page says so and suggests monitoring from a
 device that is not recording. Removing the listener's own source (a mix-minus)
 would mean no longer hearing the final stream, so it was not built.
 
+**Automatic gain control off, noise suppression on, echo cancellation on.**
+Browser AGC would fight the mixer's own level tracking; noise suppression lowers
+the floor the tracker sees; echo cancellation is the browser default and helps
+when the monitor plays through speakers anyway.
+
 ## Testing
 
 **A simulation harness drives every integration test.** `simulate()` in the test helpers feeds the mixer with a fake clock: every 20 ms each live source renders exactly the audio covering that interval at its own rate (with an optional clock error), chunks arrive after an optional seeded network delay, sources join, stall and leave at given times, and the mixer ticks once. Thirty simulated minutes run in about a second, and every quality and timing test is a few lines on top of it.
@@ -253,7 +258,7 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | mismatched mic sensitivity | test: the duplicate test uses one device 10 dB quieter; a more sensitive device simply carries more of the share, and the quieter copy of each voice is suppressed as the square of its ratio |
 | similar levels causing gain flutter | test: *mix quality > does not flutter when two sources sit at nearly the same level*; decision: level meter release and symmetric gain smoothing, dominant hysteresis |
 | noise build-up as sources increase | test: *mix quality > does not build up noise as sources are added* (eight sources: −8.9 dB) |
-| browser automatic gain control | pending |
+| browser automatic gain control | decision: `autoGainControl: false`, `noiseSuppression: true` in the simulator's constraints |
 | monitor playback feeding back | decision: playback off by default, headphones warning, browser echo cancellation left on; the monitor is deliberately the full backend mix, see Simulator |
 | arrival jitter | test: *timing > absorbs arrival jitter and bounds latency after a stall and burst* |
 | burst after a stall | same test: the burst is trimmed to the maximum depth, no new underruns afterwards |
@@ -272,7 +277,7 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | room size cap | test: *rooms and sessions > refuses a join beyond the room size* |
 | malformed payloads | tests: *pcm > rejects an odd byte length*; *mixer api > validates sources and chunks* (odd byte length, oversize, NaN and fractional rates); *protocol > describes what is wrong with malformed messages*; *rooms and sessions > answers malformed traffic with error messages and stays up* |
 | host process stalls | test: *mixer api > skips ahead instead of bursting after a long host stall* |
-| mic permission denied | pending |
-| input device changed mid-session | pending |
-| phone lock or call interrupting capture | pending |
-| getUserMedia needing HTTPS off localhost | pending |
+| mic permission denied | decision: `NotAllowedError` becomes "Microphone access was blocked …" with a Try again button; verified by hand in a browser that blocks the microphone |
+| input device changed mid-session | decision: the track's `ended` event stops capture and shows "Your microphone was disconnected" with Try again; `mute`/`unmute` show a paused state and recover by themselves. Not exercised by a test. |
+| phone lock or call interrupting capture | decision: the AudioContext `statechange` and the page's `visibilitychange` events pause and resume capture, with a notice while paused. Not exercised by a test. |
+| getUserMedia needing HTTPS off localhost | decision: a missing `mediaDevices` becomes a message pointing at HTTPS with "use an audio file" as the way out; `HTTPS=1 pnpm dev` serves a self-signed certificate; production terminates TLS in front |

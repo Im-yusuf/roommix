@@ -46,7 +46,7 @@ export const initialState: AppState = {
   clientId: null,
   connection: 'offline',
   mic: 'off',
-  inputKind: 'fileA',
+  inputKind: 'mic',
   inputLevel: 0,
   captureRate: null,
   roster: [],
