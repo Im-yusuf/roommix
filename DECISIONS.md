@@ -89,6 +89,63 @@ stall the last played frame already ended in a fade, so trimming the queue as
 it fills is click-free in practice and keeps memory bounded. Gradual growth
 never reaches the limit because the drift logic acts first.
 
+**Catch-up is capped at 1 s.** If the host process stalls for longer, the mixer
+skips ahead instead of emitting hundreds of stale frames at once.
+
+## Mixing
+
+**Gain sharing (Dugan automixer).** Each source's gain is its activity (level
+above its own noise floor) divided by the total activity, so gains sum to one.
+The talker's own device dominates; the other devices, which hear the same voice
+quieter and later, are attenuated in proportion, and because the gain multiplies
+an already quieter copy the duplicate is suppressed as the square of its level
+ratio. Alternatives: gating (loudest wins; choppy and loses overlaps), number-
+of-open-mics attenuation (needs a gate), aligning the copies by
+cross-correlation and summing (needs long windows, breaks when both talk).
+Measured for a copy 10 dB down and 3 ms late: comb ripple 5.74 dB with plain
+sum, 1.81 dB with gain sharing; two identical streams come out at +0.00 dB
+instead of +6.02 dB; eight noise sources sum to −8.9 dB instead of +8.8 dB.
+
+**Shares in the amplitude domain, not power.** Power-domain shares would
+suppress the duplicate as the cube of its ratio (about 0.5 dB ripple) but duck a
+quieter second talker harder. The amplitude version is the conservative choice
+for a conversation; switching is a one-line change in the strategy.
+
+**1/N in silence.** When no source is above its floor every source gets 1/N.
+This is the property that keeps noise from building up as devices join, and it
+means nobody's gain jumps when speech starts.
+
+**Gains are smoothed symmetrically (20 ms).** One coefficient in both directions keeps the smoothed gains summing to one even mid-transition; an asymmetric attack and release would let the sum exceed one during a handover. Flutter between two equal talkers is prevented upstream by the level meter's 300 ms release, not by slowing the gains. Within a frame the gain ramps per sample, so there are no steps.
+
+**Dominant source with 3 dB hysteresis.** The indicator only changes when a
+challenger is clearly ahead, so two equal talkers do not make it flicker.
+
+**Limiter without lookahead.** With gain sharing the mix gains sum to one, so
+the limiter mostly matters for the plain-sum baseline. It ramps its gain across
+the frame (a step would click) and clamps anything that overshoots during the
+ramp. Lookahead would add 20 ms of latency for the baseline's benefit.
+
+**Plain sum kept as a second strategy.** It is the baseline the tests and the
+simulator compare against. A strategy is a name and one function.
+
+## Lifecycle
+
+**Core reports states, the host decides removal.** A source is `joining` until
+its buffer primes, `live` while frames flow, `stalled` after 200 ms without
+frames, `left` after `removeSource`. The core never removes a source itself,
+because only the host knows whether a stall is a dead phone or a paused tab.
+Stalled and silent are different things: stalled means no frames arriving,
+silent means frames near the noise floor; the state machine looks only at
+arrivals.
+
+**Removal fades.** `removeSource` plays one more faded frame, then reports
+`left`. A new source may be added under the same id immediately.
+
+**Zero sources idles.** With nobody in the room the mixer emits nothing and
+re-anchors its clock when someone arrives, so there is no burst of owed frames
+and no silent stream to nowhere. Frame sequence numbers continue, so a
+consumer can see the gap.
+
 ## Edge cases, one by one
 
 Every edge case from the brief, with the test that covers it or the decision
@@ -113,14 +170,14 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | late joiner | pending |
 | slow subscriber | pending |
 | tab closed without leaving | pending |
-| stalled vs genuinely silent | pending |
+| stalled vs genuinely silent | test: *source state machine > goes joining -> live -> stalled -> live -> left*; decision: the state looks only at arrivals |
 | reconnect with the same id | pending |
-| zero sources | pending |
+| zero sources | test: *mixer api > idles with no sources and emits one frame per 20 ms once a source exists* |
 | one source | pending |
 | last leave tears the room down | pending |
 | room size cap | pending |
-| malformed payloads | test: *pcm > rejects an odd byte length*; more rows land with the mixer and the server |
-| host process stalls | pending |
+| malformed payloads | tests: *pcm > rejects an odd byte length*; *mixer api > validates sources and chunks* (odd byte length, oversize, NaN and fractional rates); the server's own row lands with it |
+| host process stalls | test: *mixer api > skips ahead instead of bursting after a long host stall* |
 | mic permission denied | pending |
 | input device changed mid-session | pending |
 | phone lock or call interrupting capture | pending |
