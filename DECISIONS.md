@@ -193,6 +193,16 @@ server offers a self-signed certificate.
 **The server serves the built simulator.** One process is the whole
 deployment, which keeps the Dockerfile and the quick start short.
 
+## Simulator
+
+**Vanilla TypeScript for the simulator.** The page is static HTML plus one
+`render(state)` function; about 700 lines in all. A framework would add a
+build-time dependency, a mental model to explain, and nothing the page needs.
+
+**Reconnect with backoff; the join is replayed with the known id.** The server
+then replaces the old participant and the tab re-announces its source and
+subscription.
+
 ## Testing
 
 **A simulation harness drives every integration test.** `simulate()` in the test helpers feeds the mixer with a fake clock: every 20 ms each live source renders exactly the audio covering that interval at its own rate (with an optional clock error), chunks arrive after an optional seeded network delay, sources join, stall and leave at given times, and the mixer ticks once. Thirty simulated minutes run in about a second, and every quality and timing test is a few lines on top of it.

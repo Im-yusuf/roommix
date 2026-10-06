@@ -1,0 +1,20 @@
+{
+  "name": "@roommix/simulator",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Browser test simulator: join a room, record from a mic or a fixture file, monitor the mixed stream.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@roommix/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@roommix/server": "workspace:*",
+    "vite": "^8.3.2"
+  }
+}

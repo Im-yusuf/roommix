@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>roommix simulator</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>roommix</h1>
+      <span class="row">
+        <span id="connection" class="pill">offline</span>
+        <button id="leave" class="danger small hidden">Leave</button>
+      </span>
+    </header>
+
+    <div id="notice" class="notice hidden" role="status">
+      <span id="notice-text"></span>
+      <button id="notice-action" class="small hidden"></button>
+      <button id="notice-dismiss" class="small ghost" aria-label="Dismiss">✕</button>
+    </div>
+
+    <main>
+      <section id="lobby" class="card">
+        <h2>Join a room</h2>
+        <p class="hint">
+          Everyone who joins the same room is mixed into one stream. Open this page on each device
+          (or in two tabs) and use the same room name.
+        </p>
+        <form id="join-form">
+          <label>Room <input id="room" required maxlength="32" pattern="[\w.\-]+" autocomplete="off" value="demo" /></label>
+          <label>Your name <input id="name" required maxlength="32" autocomplete="nickname" /></label>
+          <button type="submit" class="big primary">Join</button>
+        </form>
+      </section>
+
+      <section id="session" class="card hidden">
+        <div>In <strong id="session-room"></strong> as <strong id="session-name"></strong></div>
+      </section>
+
+      <section id="participants-card" class="card hidden">
+        <h2>Participants</h2>
+        <ul id="participants" class="participants"></ul>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
