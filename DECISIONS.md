@@ -162,6 +162,8 @@ that follows from the model (comb ripple for a given level ratio, +6 dB for
 doubling, 3 dB per doubling of noise sources, resampler stopband). Clicks are
 detected as sample-to-sample jumps above 1.5× the test tone's own slope.
 
+**Fixture clips are synthesised speech.** Two people talk in turns, made with macOS `say` and mixed with ffmpeg so that each clip is what one device would hear: its own speaker loud and the other 10 dB quieter and 3 ms late, the duplicate problem the mixer exists to solve. Device A is 48 kHz and device B is 44.1 kHz, so the CLI and the simulator both exercise the resampler. Real recordings would be better; these are reproducible and need no microphone.
+
 ## Edge cases, one by one
 
 Every edge case from the brief, with the test that covers it or the decision
