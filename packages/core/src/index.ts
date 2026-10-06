@@ -5,3 +5,4 @@ export { createMixer } from './mixer.js';
 export { dbToLinear, type LevelReading, rms } from './pipeline/level-meter.js';
 export { createResampler, type Resampler } from './pipeline/resampler.js';
 export type * from './types.js';
+export { decodeWav, encodeWav, type WavData } from './wav.js';
