@@ -128,6 +128,12 @@ ramp. Lookahead would add 20 ms of latency for the baseline's benefit.
 **Plain sum kept as a second strategy.** It is the baseline the tests and the
 simulator compare against. A strategy is a name and one function.
 
+**Both talking at once is a known limit.** When two people speak together both
+sources get similar gains and each voice is still comb-filtered by its own
+crosstalk copy (up to ±2.4 dB with the copy 10 dB down). Removing that needs
+alignment or separation, both out of scope; the test for this case uses
+frequencies where the comb is neutral so it isolates what gain sharing does.
+
 ## Lifecycle
 
 **Core reports states, the host decides removal.** A source is `joining` until
@@ -157,12 +163,12 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 
 | edge case | covered by |
 |---|---|
-| same voice on both devices | pending |
-| two tabs sharing one mic | pending |
-| both people talking at once | pending |
-| mismatched mic sensitivity | pending |
-| similar levels causing gain flutter | pending |
-| noise build-up as sources increase | pending |
+| same voice on both devices | test: *mix quality > suppresses the duplicate*; decision: gain sharing |
+| two tabs sharing one mic | test: *mix quality > keeps identical streams at single-source level*: two identical sources get 0.5 each, the mix is one copy at the original level |
+| both people talking at once | test: *mix quality > keeps both talkers when they speak at once*; decision: comb filtering remains, see Mixing |
+| mismatched mic sensitivity | test: the duplicate test uses one device 10 dB quieter; a more sensitive device simply carries more of the share, and the quieter copy of each voice is suppressed as the square of its ratio |
+| similar levels causing gain flutter | test: *mix quality > does not flutter when two sources sit at nearly the same level*; decision: level meter release and symmetric gain smoothing, dominant hysteresis |
+| noise build-up as sources increase | test: *mix quality > does not build up noise as sources are added* (eight sources: −8.9 dB) |
 | browser automatic gain control | pending |
 | monitor playback feeding back | pending |
 | arrival jitter | pending |
@@ -177,7 +183,7 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | stalled vs genuinely silent | test: *source state machine > goes joining -> live -> stalled -> live -> left*; decision: the state looks only at arrivals |
 | reconnect with the same id | pending |
 | zero sources | test: *mixer api > idles with no sources and emits one frame per 20 ms once a source exists* |
-| one source | pending |
+| one source | test: *mix quality > passes a single source through at unity* |
 | last leave tears the room down | pending |
 | room size cap | pending |
 | malformed payloads | tests: *pcm > rejects an odd byte length*; *mixer api > validates sources and chunks* (odd byte length, oversize, NaN and fractional rates); the server's own row lands with it |
