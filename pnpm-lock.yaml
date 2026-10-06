@@ -190,6 +190,12 @@ importers:
 
   packages/core: {}
 
+  packages/server:
+    dependencies:
+      '@roommix/core':
+        specifier: workspace:*
+        version: link:../core
+
 packages:
 
   '@biomejs/biome@2.5.15':

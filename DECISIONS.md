@@ -152,6 +152,15 @@ re-anchors its clock when someone arrives, so there is no burst of owed frames
 and no silent stream to nowhere. Frame sequence numbers continue, so a
 consumer can see the gap.
 
+## Server
+
+**Raw PCM16 in binary frames, JSON in text frames.** No per-chunk header:
+TCP keeps order, the core accepts any chunk size, and the sequence number rides
+in the roster. The codec question (Opus) is answered by the transport swap, not
+by a header format.
+
+**Rooms talk to clients only through `Connection` and `Transport`.** The interfaces come first, with an in-memory fake for tests, so room and session logic is written and tested without a socket in sight. A WebSocket adapter, a WebRTC data channel or any other ordered byte pipe plugs in behind them.
+
 ## Testing
 
 **A simulation harness drives every integration test.** `simulate()` in the test helpers feeds the mixer with a fake clock: every 20 ms each live source renders exactly the audio covering that interval at its own rate (with an optional clock error), chunks arrive after an optional seeded network delay, sources join, stall and leave at given times, and the mixer ticks once. Thirty simulated minutes run in about a second, and every quality and timing test is a few lines on top of it.
