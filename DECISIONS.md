@@ -32,6 +32,10 @@ rounding until the final conversion.
 **Biome, Vitest, tsx.** One tool for lint and format, one for tests, one to run
 TypeScript in development. All dev-only.
 
+## Pipeline
+
+**Validate at the edge, then never again.** `push` turns odd byte lengths, chunks over a second, unaligned byte views and bad sample rates into `MixerError`s with stable codes, so every later stage can assume clean input. Unaligned views (socket buffers are often slices of a pool) are copied; aligned ones are viewed in place.
+
 ## Edge cases, one by one
 
 Every edge case from the brief, with the test that covers it or the decision
@@ -62,7 +66,7 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | one source | pending |
 | last leave tears the room down | pending |
 | room size cap | pending |
-| malformed payloads | pending |
+| malformed payloads | test: *pcm > rejects an odd byte length*; more rows land with the mixer and the server |
 | host process stalls | pending |
 | mic permission denied | pending |
 | input device changed mid-session | pending |
