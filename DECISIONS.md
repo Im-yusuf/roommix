@@ -180,7 +180,7 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | arrival jitter | test: *timing > absorbs arrival jitter and bounds latency after a stall and burst* |
 | burst after a stall | same test: the burst is trimmed to the maximum depth, no new underruns afterwards |
 | clock drift | tests: *timing > keeps buffer depth bounded over 30 minutes at ±200 ppm*; *still corrects drift, click-free, when the source is never quiet* |
-| 44.1 vs 48 kHz inputs | tests: *resampler > handles the non-integer 44.1 kHz ratio*, *passes a 1 kHz tone from 48 kHz to 16 kHz within 0.5 dB* |
+| 44.1 vs 48 kHz inputs | tests: *resampler > handles the non-integer 44.1 kHz ratio*, *passes a 1 kHz tone from 48 kHz to 16 kHz within 0.5 dB*; *mixFiles > mixes files of different rates and channel counts into 16 kHz mono* |
 | browsers ignoring the requested rate | pending |
 | arbitrary chunk sizes, including 128 samples | tests: *resampler > is identical whether fed in one chunk or in arbitrary small chunks* (1, 7, 128, 333, 960, 4000); *mixer api > validates sources and chunks* pushes 128 samples |
 | late joiner | test: *timing > a late joiner is heard within the jitter target and disturbs nothing* |

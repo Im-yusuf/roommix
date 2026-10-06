@@ -1,0 +1,19 @@
+{
+  "name": "@roommix/cli",
+  "version": "0.1.0",
+  "description": "Offline mixer: WAV files in, one mixed WAV out, through the same core as the live service.",
+  "type": "module",
+  "bin": {
+    "roommix-mix": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@roommix/core": "workspace:*"
+  }
+}
