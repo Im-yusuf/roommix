@@ -52,6 +52,41 @@
         <h2>Participants</h2>
         <ul id="participants" class="participants"></ul>
       </section>
+      <section id="monitor-card" class="card hidden">
+        <h2>Monitor</h2>
+        <p class="hint">
+          Use headphones. Playing the mix through speakers feeds it straight back into every
+          microphone in the room.
+        </p>
+        <div class="row">
+          <button id="play-toggle" class="big">Play mix</button>
+          <div class="meter grow" aria-label="Output level"><div id="output-meter" class="meter-fill"></div></div>
+        </div>
+        <p class="hint">
+          You hear exactly what the backend receives: the final mix, including your own
+          microphone about 150 ms late. For a natural listen, monitor from a device that is
+          not recording.
+        </p>
+        <dl class="stats">
+          <div><dt>Dominant</dt><dd id="dominant">–</dd></div>
+          <div><dt>Playback buffer</dt><dd id="playback-buffer">–</dd></div>
+          <div><dt>Latency (estimate)</dt><dd id="latency">–</dd></div>
+          <div><dt>Playback underruns</dt><dd id="playback-underruns">0</dd></div>
+          <div><dt>Mixed frames</dt><dd id="sequence">0</dd></div>
+        </dl>
+        <label>Mix strategy
+          <select id="strategy">
+            <option value="gain-sharing">Gain sharing (default)</option>
+            <option value="plain-sum">Plain sum (baseline for comparison)</option>
+          </select>
+        </label>
+        <div class="row">
+          <button id="record-toggle">Record mix</button>
+          <button id="recording-play" class="hidden">Play recording</button>
+          <a id="download" class="button hidden" download="roommix.wav">Download WAV</a>
+          <span id="record-info" class="hint"></span>
+        </div>
+      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

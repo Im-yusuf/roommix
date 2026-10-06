@@ -1,5 +1,8 @@
+import type { StrategyName } from '@roommix/core';
 import type { ServerMessage } from '@roommix/server/protocol';
 import { type Capture, type InputKind, startCapture } from './audio/capture.js';
+import { type Playback, startPlayback } from './audio/playback.js';
+import { createRecorder } from './audio/recorder.js';
 import { createClient } from './client.js';
 import type { Notice, Store } from './state.js';
 
@@ -12,10 +15,17 @@ export function createApp(store: Store) {
   const client = createClient(wsUrl(), {
     status: onStatus,
     message: onMessage,
-    frame: () => {}, // the mixed stream is not consumed until the monitor exists
+    frame: onFrame,
   });
 
   let capture: Capture | null = null;
+  let playback: Playback | null = null;
+  const recorder = createRecorder();
+  const recordingPlayer = new Audio();
+  recordingPlayer.addEventListener('ended', () => {
+    store.update((st) => ({ monitor: { ...st.monitor, playingRecording: false } }));
+  });
+  let lastRecordedUpdate = 0;
 
   const notify = (notice: Notice | null) => store.update({ notice });
   const storageKey = (room: string) => `roommix:${room}`;
@@ -45,6 +55,7 @@ export function createApp(store: Store) {
           client.send({ type: 'start', sampleRate: capture.sampleRate });
           audioReady = true;
         }
+        syncSubscription();
         return;
       case 'roster':
         store.update({
@@ -77,6 +88,22 @@ export function createApp(store: Store) {
     }
   }
 
+  function onFrame(pcm: Int16Array): void {
+    playback?.push(pcm);
+    if (!store.state.monitor.recording) return;
+    recorder.push(pcm);
+    const now = performance.now();
+    if (now - lastRecordedUpdate > 250) {
+      lastRecordedUpdate = now;
+      store.update((s) => ({ monitor: { ...s.monitor, recordedMs: recorder.durationMs } }));
+    }
+  }
+
+  function syncSubscription(): void {
+    const { playing, recording } = store.state.monitor;
+    client.send({ type: 'subscribe', enabled: playing || recording });
+  }
+
   function join(room: string, name: string): void {
     store.update({ phase: 'joined', room, name, notice: null, roster: [], dominant: null });
     client.join({
@@ -88,9 +115,18 @@ export function createApp(store: Store) {
   }
 
   async function leave(): Promise<void> {
+    stopRecordingPlayback();
     await stopInput(false);
+    await stopPlayback();
     client.leave();
-    store.update({ phase: 'lobby', roster: [], dominant: null, clientId: null, notice: null });
+    store.update((s) => ({
+      phase: 'lobby',
+      roster: [],
+      dominant: null,
+      clientId: null,
+      notice: null,
+      monitor: { ...s.monitor, recording: false },
+    }));
   }
 
   async function startInput(): Promise<void> {
@@ -142,11 +178,94 @@ export function createApp(store: Store) {
     if (wasOn) void stopInput().then(startInput);
   }
 
+  async function togglePlayback(): Promise<void> {
+    if (playback) {
+      await stopPlayback();
+    } else {
+      try {
+        playback = await startPlayback((stats) =>
+          store.update((s) => ({
+            monitor: {
+              ...s.monitor,
+              outputLevel: stats.rms,
+              bufferMs: stats.bufferMs,
+              underruns: stats.underruns,
+            },
+          })),
+        );
+        store.update((s) => ({ monitor: { ...s.monitor, playing: true } }));
+      } catch (error) {
+        notify({
+          tone: 'error',
+          message: `Playback could not start: ${error instanceof Error ? error.message : error}`,
+        });
+      }
+    }
+    syncSubscription();
+  }
+
+  async function stopPlayback(): Promise<void> {
+    if (!playback) return;
+    const current = playback;
+    playback = null;
+    await current.stop();
+    store.update((s) => ({
+      monitor: { ...s.monitor, playing: false, outputLevel: 0, bufferMs: 0 },
+    }));
+  }
+
+  function toggleRecording(): void {
+    const { monitor } = store.state;
+    if (monitor.recording) {
+      if (monitor.downloadUrl) URL.revokeObjectURL(monitor.downloadUrl);
+      const downloadUrl = URL.createObjectURL(recorder.toBlob());
+      store.update({
+        monitor: { ...monitor, recording: false, recordedMs: recorder.durationMs, downloadUrl },
+      });
+    } else {
+      stopRecordingPlayback();
+      recorder.clear();
+      store.update((st) => ({
+        monitor: { ...st.monitor, recording: true, recordedMs: 0, downloadUrl: null },
+      }));
+    }
+    syncSubscription();
+  }
+
+  function toggleRecordingPlayback(): void {
+    const { monitor } = store.state;
+    if (monitor.playingRecording) {
+      stopRecordingPlayback();
+      return;
+    }
+    if (!monitor.downloadUrl) return;
+    if (recordingPlayer.src !== monitor.downloadUrl) recordingPlayer.src = monitor.downloadUrl;
+    void recordingPlayer.play();
+    store.update({ monitor: { ...monitor, playingRecording: true } });
+  }
+
+  function stopRecordingPlayback(): void {
+    recordingPlayer.pause();
+    recordingPlayer.currentTime = 0;
+    if (store.state.monitor.playingRecording) {
+      store.update((st) => ({ monitor: { ...st.monitor, playingRecording: false } }));
+    }
+  }
+
+  function setStrategy(name: StrategyName): void {
+    client.send({ type: 'strategy', name });
+    store.update({ strategy: name });
+  }
+
   return {
     join,
     leave,
     toggleInput: () => (capture ? stopInput() : startInput()),
     setInputKind,
+    togglePlayback,
+    toggleRecording,
+    toggleRecordingPlayback,
+    setStrategy,
     dismissNotice: () => notify(null),
   };
 }

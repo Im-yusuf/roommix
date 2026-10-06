@@ -1,3 +1,4 @@
+import type { StrategyName } from '@roommix/core';
 import { createApp } from './app.js';
 import type { InputKind } from './audio/capture.js';
 import { createStore, initialState } from './state.js';
@@ -23,5 +24,11 @@ $('leave').onclick = () => void app.leave();
 $('mic-toggle').onclick = () => void app.toggleInput();
 $<HTMLSelectElement>('input-kind').onchange = (event) => {
   app.setInputKind((event.target as HTMLSelectElement).value as InputKind);
+};
+$('play-toggle').onclick = () => void app.togglePlayback();
+$('record-toggle').onclick = () => app.toggleRecording();
+$('recording-play').onclick = () => app.toggleRecordingPlayback();
+$<HTMLSelectElement>('strategy').onchange = (event) => {
+  app.setStrategy((event.target as HTMLSelectElement).value as StrategyName);
 };
 $('notice-dismiss').onclick = () => app.dismissNotice();

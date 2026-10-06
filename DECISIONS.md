@@ -218,6 +218,16 @@ problem the mixer exists to solve, reproducible on one laptop.
 rates, so the page reports whatever rate the context runs at and the server
 resamples. This also exercises the real pipeline.
 
+**Monitor playback: a 16 kHz AudioContext, a worklet ring buffer with 100 ms
+of prebuffer, off by default, with a headphones warning.** The monitor is for
+listening, not the product path, so its own buffering is deliberately plain.
+If the browser refuses a 16 kHz context the worklet interpolates. The monitor
+plays the full mix on purpose: it exists to verify the stream the backend
+receives, so a device that is both recording and monitoring hears its own
+microphone about 150 ms late. The page says so and suggests monitoring from a
+device that is not recording. Removing the listener's own source (a mix-minus)
+would mean no longer hearing the final stream, so it was not built.
+
 ## Testing
 
 **A simulation harness drives every integration test.** `simulate()` in the test helpers feeds the mixer with a fake clock: every 20 ms each live source renders exactly the audio covering that interval at its own rate (with an optional clock error), chunks arrive after an optional seeded network delay, sources join, stall and leave at given times, and the mixer ticks once. Thirty simulated minutes run in about a second, and every quality and timing test is a few lines on top of it.
@@ -244,7 +254,7 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | similar levels causing gain flutter | test: *mix quality > does not flutter when two sources sit at nearly the same level*; decision: level meter release and symmetric gain smoothing, dominant hysteresis |
 | noise build-up as sources increase | test: *mix quality > does not build up noise as sources are added* (eight sources: −8.9 dB) |
 | browser automatic gain control | pending |
-| monitor playback feeding back | pending |
+| monitor playback feeding back | decision: playback off by default, headphones warning, browser echo cancellation left on; the monitor is deliberately the full backend mix, see Simulator |
 | arrival jitter | test: *timing > absorbs arrival jitter and bounds latency after a stall and burst* |
 | burst after a stall | same test: the burst is trimmed to the maximum depth, no new underruns afterwards |
 | clock drift | tests: *timing > keeps buffer depth bounded over 30 minutes at ±200 ppm*; *still corrects drift, click-free, when the source is never quiet* |

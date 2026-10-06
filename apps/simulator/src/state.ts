@@ -25,6 +25,17 @@ export interface AppState {
   dominant: string | null;
   strategy: StrategyName;
   sequence: number;
+  monitor: {
+    playing: boolean;
+    recording: boolean;
+    /** The finished recording is playing back in the page. */
+    playingRecording: boolean;
+    outputLevel: number;
+    bufferMs: number;
+    underruns: number;
+    recordedMs: number;
+    downloadUrl: string | null;
+  };
   notice: Notice | null;
 }
 
@@ -42,6 +53,16 @@ export const initialState: AppState = {
   dominant: null,
   strategy: 'gain-sharing',
   sequence: 0,
+  monitor: {
+    playing: false,
+    recording: false,
+    playingRecording: false,
+    outputLevel: 0,
+    bufferMs: 0,
+    underruns: 0,
+    recordedMs: 0,
+    downloadUrl: null,
+  },
   notice: null,
 };
 

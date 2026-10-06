@@ -31,6 +31,19 @@ export function createRenderer() {
   const captureInfo = $('capture-info');
   const participantsCard = $('participants-card');
   const participants = $<HTMLUListElement>('participants');
+  const monitorCard = $('monitor-card');
+  const playToggle = $<HTMLButtonElement>('play-toggle');
+  const outputMeter = $('output-meter');
+  const dominant = $('dominant');
+  const playbackBuffer = $('playback-buffer');
+  const latency = $('latency');
+  const playbackUnderruns = $('playback-underruns');
+  const sequence = $('sequence');
+  const strategy = $<HTMLSelectElement>('strategy');
+  const recordToggle = $<HTMLButtonElement>('record-toggle');
+  const download = $<HTMLAnchorElement>('download');
+  const recordingPlay = $<HTMLButtonElement>('recording-play');
+  const recordInfo = $('record-info');
 
   let renderedRoster: RosterEntry[] | null = null;
   let renderedDominant: string | null = null;
@@ -51,7 +64,8 @@ export function createRenderer() {
 
     const joined = state.phase === 'joined';
     lobby.classList.toggle('hidden', joined);
-    for (const card of [session, participantsCard]) card.classList.toggle('hidden', !joined);
+    for (const card of [session, participantsCard, monitorCard])
+      card.classList.toggle('hidden', !joined);
     leave.classList.toggle('hidden', !joined);
     sessionRoom.textContent = state.room;
     sessionName.textContent = state.name;
@@ -86,6 +100,41 @@ export function createRenderer() {
         ),
       );
     }
+
+    playToggle.textContent = state.monitor.playing ? 'Stop playback' : 'Play mix';
+    playToggle.classList.toggle('active', state.monitor.playing);
+    outputMeter.style.width = `${levelToPercent(state.monitor.outputLevel)}%`;
+    dominant.textContent = state.roster.find((p) => p.clientId === state.dominant)?.name ?? '–';
+    playbackBuffer.textContent = state.monitor.playing
+      ? `${Math.round(state.monitor.bufferMs)} ms`
+      : '–';
+    // Mixer-side buffering of the deepest live source, one frame of mixing, and the playback buffer.
+    const deepest = Math.max(
+      0,
+      ...state.roster.filter((p) => p.state === 'live').map((p) => p.bufferMs),
+    );
+    latency.textContent = state.monitor.playing
+      ? `~${Math.round(deepest + 20 + state.monitor.bufferMs)} ms`
+      : '–';
+    playbackUnderruns.textContent = String(state.monitor.underruns);
+    sequence.textContent = String(state.sequence);
+    if (strategy.value !== state.strategy) strategy.value = state.strategy;
+
+    recordToggle.textContent = state.monitor.recording
+      ? `Stop recording (${(state.monitor.recordedMs / 1000).toFixed(0)} s)`
+      : 'Record mix';
+    recordToggle.classList.toggle('active', state.monitor.recording);
+    download.classList.toggle('hidden', state.monitor.downloadUrl === null);
+    recordingPlay.classList.toggle('hidden', state.monitor.downloadUrl === null);
+    recordingPlay.textContent = state.monitor.playingRecording
+      ? 'Pause recording'
+      : 'Play recording';
+    recordingPlay.classList.toggle('active', state.monitor.playingRecording);
+    download.href = state.monitor.downloadUrl ?? '#';
+    recordInfo.textContent =
+      !state.monitor.recording && state.monitor.downloadUrl
+        ? `${(state.monitor.recordedMs / 1000).toFixed(1)} s of 16 kHz mono WAV`
+        : '';
   };
 }
 
