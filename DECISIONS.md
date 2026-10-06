@@ -203,6 +203,21 @@ build-time dependency, a mental model to explain, and nothing the page needs.
 then replaces the old participant and the tab re-announces its source and
 subscription.
 
+**getUserMedia plus AudioWorklet.** `MediaRecorder` produces compressed
+containers at its own cadence; `ScriptProcessorNode` is deprecated and runs on
+the main thread. The worklet taps the stream on the audio thread and posts
+20 ms PCM16 chunks.
+
+**File as microphone goes through the same worklet.** A looping decoded clip
+replaces the microphone node; nothing else changes. The two bundled clips are
+synthesised with macOS `say` and mixed so that each "device" hears its own
+speaker loud and the other 10 dB down and 3 ms late, which is the duplicate
+problem the mixer exists to solve, reproducible on one laptop.
+
+**The native capture rate is sent as is.** Browsers largely ignore requested
+rates, so the page reports whatever rate the context runs at and the server
+resamples. This also exercises the real pipeline.
+
 ## Testing
 
 **A simulation harness drives every integration test.** `simulate()` in the test helpers feeds the mixer with a fake clock: every 20 ms each live source renders exactly the audio covering that interval at its own rate (with an optional clock error), chunks arrive after an optional seeded network delay, sources join, stall and leave at given times, and the mixer ticks once. Thirty simulated minutes run in about a second, and every quality and timing test is a few lines on top of it.
@@ -234,7 +249,7 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | burst after a stall | same test: the burst is trimmed to the maximum depth, no new underruns afterwards |
 | clock drift | tests: *timing > keeps buffer depth bounded over 30 minutes at ±200 ppm*; *still corrects drift, click-free, when the source is never quiet* |
 | 44.1 vs 48 kHz inputs | tests: *resampler > handles the non-integer 44.1 kHz ratio*, *passes a 1 kHz tone from 48 kHz to 16 kHz within 0.5 dB*; *mixFiles > mixes files of different rates and channel counts into 16 kHz mono* |
-| browsers ignoring the requested rate | pending |
+| browsers ignoring the requested rate | decision: the simulator never requests a rate; it reports the context's actual rate in `start` and the server resamples |
 | arbitrary chunk sizes, including 128 samples | tests: *resampler > is identical whether fed in one chunk or in arbitrary small chunks* (1, 7, 128, 333, 960, 4000); *mixer api > validates sources and chunks* pushes 128 samples |
 | late joiner | test: *timing > a late joiner is heard within the jitter target and disturbs nothing* |
 | slow subscriber | test: *rooms and sessions > skips frames for a slow subscriber instead of holding up the mixer*; decision: bounded by buffered bytes, frames skipped and counted |

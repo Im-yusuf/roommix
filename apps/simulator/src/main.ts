@@ -1,4 +1,5 @@
 import { createApp } from './app.js';
+import type { InputKind } from './audio/capture.js';
 import { createStore, initialState } from './state.js';
 import { $ } from './ui/dom.js';
 import { createRenderer } from './ui/render.js';
@@ -18,5 +19,9 @@ $<HTMLFormElement>('join-form').addEventListener('submit', (event) => {
   localStorage.setItem('roommix:name', nameInput.value.trim());
   app.join(roomInput.value.trim(), nameInput.value.trim());
 });
-$('leave').onclick = () => app.leave();
+$('leave').onclick = () => void app.leave();
+$('mic-toggle').onclick = () => void app.toggleInput();
+$<HTMLSelectElement>('input-kind').onchange = (event) => {
+  app.setInputKind((event.target as HTMLSelectElement).value as InputKind);
+};
 $('notice-dismiss').onclick = () => app.dismissNotice();

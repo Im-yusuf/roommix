@@ -1,6 +1,9 @@
 import type { StrategyName } from '@roommix/core';
 import type { RosterEntry } from '@roommix/server/protocol';
+import type { InputKind } from './audio/capture.js';
 import type { ConnectionStatus } from './client.js';
+
+export type MicStatus = 'off' | 'starting' | 'on' | 'paused';
 
 export interface Notice {
   tone: 'info' | 'error';
@@ -14,6 +17,10 @@ export interface AppState {
   name: string;
   clientId: string | null;
   connection: ConnectionStatus;
+  mic: MicStatus;
+  inputKind: InputKind;
+  inputLevel: number;
+  captureRate: number | null;
   roster: RosterEntry[];
   dominant: string | null;
   strategy: StrategyName;
@@ -27,6 +34,10 @@ export const initialState: AppState = {
   name: '',
   clientId: null,
   connection: 'offline',
+  mic: 'off',
+  inputKind: 'fileA',
+  inputLevel: 0,
+  captureRate: null,
   roster: [],
   dominant: null,
   strategy: 'gain-sharing',

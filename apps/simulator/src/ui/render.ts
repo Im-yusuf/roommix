@@ -2,6 +2,8 @@ import type { RosterEntry } from '@roommix/server/protocol';
 import type { AppState } from '../state.js';
 import { $ } from './dom.js';
 
+const INPUT_LABELS = { fileA: 'file A', fileB: 'file B' } as const;
+
 /** Maps an RMS level to a meter width: -60 dBFS is empty, 0 dBFS is full. */
 export function levelToPercent(rms: number): number {
   if (rms <= 0) return 0;
@@ -23,6 +25,10 @@ export function createRenderer() {
   const session = $('session');
   const sessionRoom = $('session-room');
   const sessionName = $('session-name');
+  const inputKind = $<HTMLSelectElement>('input-kind');
+  const micToggle = $<HTMLButtonElement>('mic-toggle');
+  const inputMeter = $('input-meter');
+  const captureInfo = $('capture-info');
   const participantsCard = $('participants-card');
   const participants = $<HTMLUListElement>('participants');
 
@@ -49,6 +55,23 @@ export function createRenderer() {
     leave.classList.toggle('hidden', !joined);
     sessionRoom.textContent = state.room;
     sessionName.textContent = state.name;
+
+    if (inputKind.value !== state.inputKind) inputKind.value = state.inputKind;
+    const input = INPUT_LABELS[state.inputKind];
+    micToggle.disabled = state.mic === 'starting';
+    micToggle.classList.toggle('active', state.mic === 'on' || state.mic === 'paused');
+    micToggle.textContent =
+      state.mic === 'off'
+        ? `Start ${input}`
+        : state.mic === 'starting'
+          ? 'Starting…'
+          : state.mic === 'paused'
+            ? `Paused · stop ${input}`
+            : `Stop ${input}`;
+    inputMeter.style.width = `${levelToPercent(state.inputLevel)}%`;
+    captureInfo.textContent = state.captureRate
+      ? `Sending ${state.captureRate} Hz PCM16 in 20 ms chunks; the server resamples to 16 kHz.`
+      : '';
 
     if (state.roster !== renderedRoster || state.dominant !== renderedDominant) {
       renderedRoster = state.roster;

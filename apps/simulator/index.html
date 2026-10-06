@@ -37,6 +37,15 @@
 
       <section id="session" class="card hidden">
         <div>In <strong id="session-room"></strong> as <strong id="session-name"></strong></div>
+        <label>Input
+          <select id="input-kind">
+            <option value="fileA">Audio file: device A (Samantha near, Daniel far)</option>
+            <option value="fileB">Audio file: device B (Daniel near, Samantha far)</option>
+          </select>
+        </label>
+        <button id="mic-toggle" class="big primary">Start file A</button>
+        <div class="meter" aria-label="Input level"><div id="input-meter" class="meter-fill"></div></div>
+        <p id="capture-info" class="hint"></p>
       </section>
 
       <section id="participants-card" class="card hidden">

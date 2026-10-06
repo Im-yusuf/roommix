@@ -1,4 +1,5 @@
 import type { ServerMessage } from '@roommix/server/protocol';
+import { type Capture, type InputKind, startCapture } from './audio/capture.js';
 import { createClient } from './client.js';
 import type { Notice, Store } from './state.js';
 
@@ -6,11 +7,15 @@ const RECONNECT_PREFIX = 'Connection lost.';
 
 /** Everything the page can do, as actions over the store. Rendering is someone else's job. */
 export function createApp(store: Store) {
+  /** True once this connection has joined and announced its source; audio before that would be rejected. */
+  let audioReady = false;
   const client = createClient(wsUrl(), {
     status: onStatus,
     message: onMessage,
     frame: () => {}, // the mixed stream is not consumed until the monitor exists
   });
+
+  let capture: Capture | null = null;
 
   const notify = (notice: Notice | null) => store.update({ notice });
   const storageKey = (room: string) => `roommix:${room}`;
@@ -18,6 +23,7 @@ export function createApp(store: Store) {
   function onStatus(status: typeof store.state.connection, attempt: number): void {
     store.update({ connection: status });
     if (status === 'reconnecting') {
+      audioReady = false;
       notify({
         tone: 'info',
         message: `${RECONNECT_PREFIX} Reconnecting (attempt ${attempt})…`,
@@ -34,6 +40,11 @@ export function createApp(store: Store) {
         sessionStorage.setItem(storageKey(message.room), message.clientId);
         client.rememberClientId(message.clientId);
         store.update({ clientId: message.clientId, strategy: message.strategy });
+        // After a reconnect the server has a fresh participant: tell it what this tab was doing.
+        if (capture) {
+          client.send({ type: 'start', sampleRate: capture.sampleRate });
+          audioReady = true;
+        }
         return;
       case 'roster':
         store.update({
@@ -51,11 +62,11 @@ export function createApp(store: Store) {
 
   function onServerError(code: string, message: string): void {
     if (code === 'room_full') {
-      leave();
+      void leave();
       notify({ tone: 'error', message: `${message}. Try another room name.` });
     } else if (code === 'replaced') {
       const { room, name } = store.state;
-      leave();
+      void leave();
       notify({
         tone: 'error',
         message: 'You joined from another tab or device, so this one was disconnected.',
@@ -76,12 +87,68 @@ export function createApp(store: Store) {
     });
   }
 
-  function leave(): void {
+  async function leave(): Promise<void> {
+    await stopInput(false);
     client.leave();
     store.update({ phase: 'lobby', roster: [], dominant: null, clientId: null, notice: null });
   }
 
-  return { join, leave, dismissNotice: () => notify(null) };
+  async function startInput(): Promise<void> {
+    if (capture) return;
+    store.update({ mic: 'starting', notice: null });
+    try {
+      capture = await startCapture(store.state.inputKind, {
+        chunk: (pcm) => {
+          if (audioReady) client.sendAudio(pcm);
+        },
+        level: (rms) => store.update({ inputLevel: rms }),
+        paused: (reason) => {
+          store.update({ mic: 'paused' });
+          notify({ tone: 'info', message: reason });
+        },
+        resumed: () => {
+          if (store.state.mic !== 'paused') return;
+          store.update({ mic: 'on' });
+          notify(null);
+        },
+      });
+      store.update({ mic: 'on', captureRate: capture.sampleRate });
+      client.send({ type: 'start', sampleRate: capture.sampleRate });
+      audioReady = true;
+    } catch (error) {
+      capture = null;
+      store.update({ mic: 'off' });
+      notify({
+        tone: 'error',
+        message: error instanceof Error ? error.message : String(error),
+        action: { label: 'Try again', run: () => void startInput() },
+      });
+    }
+  }
+
+  async function stopInput(tellServer = true): Promise<void> {
+    if (!capture) return;
+    audioReady = false;
+    if (tellServer) client.send({ type: 'stop' });
+    const current = capture;
+    capture = null;
+    await current.stop();
+    store.update({ mic: 'off', inputLevel: 0, captureRate: null });
+  }
+
+  function setInputKind(kind: InputKind): void {
+    const wasOn = capture !== null;
+    store.update({ inputKind: kind });
+    if (wasOn) void stopInput().then(startInput);
+  }
+
+  return {
+    join,
+    leave,
+    toggleInput: () => (capture ? stopInput() : startInput()),
+    setInputKind,
+    dismissNotice: () => notify(null),
+  };
 }
 
 function wsUrl(): string {
