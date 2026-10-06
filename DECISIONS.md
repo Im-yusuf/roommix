@@ -249,6 +249,8 @@ detected as sample-to-sample jumps above 1.5× the test tone's own slope.
 
 **Fixture clips are synthesised speech.** Two people talk in turns, made with macOS `say` and mixed with ffmpeg so that each clip is what one device would hear: its own speaker loud and the other 10 dB quieter and 3 ms late, the duplicate problem the mixer exists to solve. Device A is 48 kHz and device B is 44.1 kHz, so the CLI and the simulator both exercise the resampler. Real recordings would be better; these are reproducible and need no microphone.
 
+**Server tests use an in-memory connection and fake timers; one test uses real sockets end to end.**
+
 ## Edge cases, one by one
 
 Every edge case from the brief, with the test that covers it or the decision
@@ -285,3 +287,28 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | input device changed mid-session | decision: the track's `ended` event stops capture and shows "Your microphone was disconnected" with Try again; `mute`/`unmute` show a paused state and recover by themselves. Not exercised by a test. |
 | phone lock or call interrupting capture | decision: the AudioContext `statechange` and the page's `visibilitychange` events pause and resume capture, with a notice while paused. Not exercised by a test. |
 | getUserMedia needing HTTPS off localhost | decision: a missing `mediaDevices` becomes a message pointing at HTTPS with "use an audio file" as the way out; `HTTPS=1 pnpm dev` serves a self-signed certificate; production terminates TLS in front |
+
+
+## Deliberately left out
+
+- **WebRTC and Opus.** Browsers would send Opus over SRTP with built-in jitter
+  handling. Plug-in point: a WebRTC server (for example mediasoup) decodes to
+  PCM and pushes into the same mixer; the `Transport` interface already keeps
+  rooms away from the socket type.
+- **Cross-correlation alignment.** Aligning the duplicate so it adds in phase
+  instead of comb-filtering. Plug-in point: a per-source delay stage before the
+  mix; the strategy interface would need frames, not just levels.
+- **Adaptive resampling.** Correcting drift by nudging the resampler ratio
+  instead of dropping or repeating frames. Plug-in point: the drift decision in
+  the jitter buffer; the resampler already takes any ratio.
+- **ML voice activity detection.** Plug-in point: the strategy consumes an
+  activity number per source; a VAD probability could replace level minus floor.
+- **Echo cancellation beyond the browser's.** Plug-in point: a per-source stage
+  before the jitter buffer, with the mixed output as the reference.
+- **Source separation.** Would replace the mix step entirely.
+- **Horizontal scaling.** Rooms are independent in-memory objects; shard rooms
+  across processes by room name behind a sticky router. Nothing persists.
+- **Authentication, authorization, rate limiting.** Rooms are open. A token in
+  the join message is the obvious addition.
+- **Lookahead limiting, packet loss concealment, adaptive jitter target.** See
+  the entries above for where each would go.
