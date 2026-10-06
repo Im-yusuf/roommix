@@ -50,6 +50,8 @@ timing error is at most 1/1024 sample, about −61 dB at 7 kHz, far below the
 filter's own stopband. The filter needs `half` samples of lookahead, so a
 stream's last ~1.7 ms is held until more input arrives.
 
+**Level meter: RMS with a 10 ms attack and a 300 ms release; noise floor as a minimum follower that rises at most 3 dB/s, capped at −30 dBFS.** The fast attack lets the gain shares follow speech onsets within a frame; the slow release is what stops two equal talkers from fluttering. Pauses in speech reset the floor at once; speech itself cannot become the floor; a loud steady signal cannot mute itself. Activity, the quantity the mixer shares, is level above this floor.
+
 ## Edge cases, one by one
 
 Every edge case from the brief, with the test that covers it or the decision
