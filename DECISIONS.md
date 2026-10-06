@@ -38,6 +38,18 @@ TypeScript in development. All dev-only.
 
 **DC blocker at 20 Hz, before resampling.** A one-pole high-pass with state across chunks. Microphone offset would otherwise inflate every level reading and bias the gain shares; 20 Hz is far below speech, and the test shows speech-band tones pass within 0.1 dB.
 
+**Resampler: windowed sinc, tabulated at 512 phases.** A Blackman-windowed
+sinc low-pass at 0.45× the lower rate, about 165 taps for 48 kHz, applied by
+dot product at the nearest tabulated fractional offset; position is tracked
+with integer arithmetic so there is no float drift. Alternatives: linear
+interpolation (aliases), naive decimation (aliases), a port of libsamplerate
+(a dependency), an exact rational polyphase filter (exact phases, more code).
+Measured: 1 kHz passes at 0.00 dB, flat to 6.6 kHz, −57 dB at 7.9 kHz,
+−97 dB at 10 kHz; output is bit-identical for any chunking. The nearest-phase
+timing error is at most 1/1024 sample, about −61 dB at 7 kHz, far below the
+filter's own stopband. The filter needs `half` samples of lookahead, so a
+stream's last ~1.7 ms is held until more input arrives.
+
 ## Edge cases, one by one
 
 Every edge case from the brief, with the test that covers it or the decision
@@ -56,9 +68,9 @@ that answers it. Test names are `describe > it` titles in `packages/*/test`.
 | arrival jitter | pending |
 | burst after a stall | pending |
 | clock drift | pending |
-| 44.1 vs 48 kHz inputs | pending |
+| 44.1 vs 48 kHz inputs | tests: *resampler > handles the non-integer 44.1 kHz ratio*, *passes a 1 kHz tone from 48 kHz to 16 kHz within 0.5 dB* |
 | browsers ignoring the requested rate | pending |
-| arbitrary chunk sizes, including 128 samples | pending |
+| arbitrary chunk sizes, including 128 samples | test: *resampler > is identical whether fed in one chunk or in arbitrary small chunks* (1, 7, 128, 333, 960, 4000) |
 | late joiner | pending |
 | slow subscriber | pending |
 | tab closed without leaving | pending |
