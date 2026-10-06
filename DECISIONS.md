@@ -36,6 +36,8 @@ TypeScript in development. All dev-only.
 
 **Validate at the edge, then never again.** `push` turns odd byte lengths, chunks over a second, unaligned byte views and bad sample rates into `MixerError`s with stable codes, so every later stage can assume clean input. Unaligned views (socket buffers are often slices of a pool) are copied; aligned ones are viewed in place.
 
+**DC blocker at 20 Hz, before resampling.** A one-pole high-pass with state across chunks. Microphone offset would otherwise inflate every level reading and bias the gain shares; 20 Hz is far below speech, and the test shows speech-band tones pass within 0.1 dB.
+
 ## Edge cases, one by one
 
 Every edge case from the brief, with the test that covers it or the decision
