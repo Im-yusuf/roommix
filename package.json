@@ -5,7 +5,7 @@
   "description": "Real-time audio mixing service for face-to-face translation: core library, WebSocket server, browser simulator.",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "packageManager": "pnpm@12.9.1",
   "scripts": {
@@ -15,10 +15,10 @@
     "format": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ci": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "mix": "tsx --tsconfig packages/cli/tsconfig.json packages/cli/src/cli.ts",
     "dev": "pnpm -r --parallel dev",
-    "start": "node packages/server/dist/main.js"
+    "start": "node packages/server/dist/main.js",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

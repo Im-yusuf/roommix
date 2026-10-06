@@ -35,7 +35,8 @@ alternatives, and what was deliberately left out.
 
 ## Quick start
 
-Needs Node 20 or newer and pnpm (`npm install -g pnpm`).
+Needs Node 22.12 or newer (24 is what CI and the Docker image use) and pnpm
+(`npm install -g pnpm`).
 
 ```bash
 pnpm install
@@ -200,7 +201,7 @@ Mixer options: `strategy` (`gain-sharing`), `jitterTargetMs` (60),
 
 ```bash
 pnpm test        # about five seconds
-pnpm ci          # lint, typecheck, test, build; what the GitHub workflow runs
+pnpm check       # lint, typecheck, test, build; what the GitHub workflow runs
 ```
 
 The audio quality bar is proven on synthetic signals with a fake clock, so
