@@ -288,6 +288,19 @@ export function createApp(store: Store) {
     store.update({ net: net.settings });
   }
 
+  function setAdvanced(on: boolean): void {
+    localStorage.setItem('roommix:advanced', on ? '1' : '0');
+    store.update({ advanced: on });
+    if (on) return;
+    // Leaving the advanced view puts every setting it hides back to its default,
+    // so nothing keeps acting on the session out of sight.
+    if (store.state.phase === 'joined' && store.state.strategy !== 'gain-sharing')
+      setStrategy('gain-sharing');
+    const { delayMs, jitterMs, dropPercent } = store.state.net;
+    if (delayMs || jitterMs || dropPercent) setNetwork({ delayMs: 0, jitterMs: 0, dropPercent: 0 });
+    if (capture === null && store.state.inputKind !== 'mic') store.update({ inputKind: 'mic' });
+  }
+
   return {
     join,
     leave,
@@ -298,6 +311,7 @@ export function createApp(store: Store) {
     toggleRecordingPlayback,
     setStrategy,
     setNetwork,
+    setAdvanced,
     dismissNotice: () => notify(null),
   };
 }

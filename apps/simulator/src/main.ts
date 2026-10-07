@@ -10,6 +10,7 @@ const app = createApp(store);
 const render = createRenderer();
 store.subscribe(render);
 render(store.state);
+app.setAdvanced(localStorage.getItem('roommix:advanced') === '1');
 
 const roomInput = $<HTMLInputElement>('room');
 const nameInput = $<HTMLInputElement>('name');
@@ -32,6 +33,9 @@ $<HTMLSelectElement>('strategy').onchange = (event) => {
   app.setStrategy((event.target as HTMLSelectElement).value as StrategyName);
 };
 $('notice-dismiss').onclick = () => app.dismissNotice();
+$<HTMLInputElement>('advanced').onchange = (event) => {
+  app.setAdvanced((event.target as HTMLInputElement).checked);
+};
 
 const bindRange = (id: string, key: 'delayMs' | 'jitterMs' | 'dropPercent') => {
   $<HTMLInputElement>(id).oninput = (event) => {

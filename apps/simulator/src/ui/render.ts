@@ -47,6 +47,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
  */
 export function createRenderer() {
   const connection = $('connection');
+  const advanced = $<HTMLInputElement>('advanced');
   const leave = $('leave');
   const notice = $('notice');
   const noticeText = $('notice-text');
@@ -154,6 +155,8 @@ export function createRenderer() {
 
   return function render(state: AppState): void {
     document.body.dataset.phase = state.phase;
+    document.body.classList.toggle('advanced', state.advanced);
+    if (advanced.checked !== state.advanced) advanced.checked = state.advanced;
     connection.textContent = state.connection;
     connection.className = `pill ${state.connection}`;
 
@@ -263,7 +266,7 @@ function createRow(): Row {
   const fill = el('div', 'meter-fill');
   meter.append(fill);
 
-  const details = el('div', 'details');
+  const details = el('div', 'details advanced-only');
   const values = {} as Record<FactKey, HTMLElement>;
   const facts = {} as Record<FactKey, HTMLElement>;
   for (const key of FACT_KEYS) {

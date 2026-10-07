@@ -39,6 +39,8 @@ export interface AppState {
   };
   net: NetworkSettings;
   notice: Notice | null;
+  /** Shows the analytics and test-only controls: input source, figures, strategy, network simulation. */
+  advanced: boolean;
 }
 
 export const initialState: AppState = {
@@ -67,6 +69,7 @@ export const initialState: AppState = {
   },
   net: { delayMs: 0, jitterMs: 0, dropPercent: 0 },
   notice: null,
+  advanced: false,
 };
 
 /** Smallest possible store: one state object, shallow patches, listeners called after every change. */

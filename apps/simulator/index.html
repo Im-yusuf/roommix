@@ -12,6 +12,10 @@
     <header class="topbar">
       <span class="wordmark">roommix</span>
       <span class="topbar-actions">
+        <label class="switch">
+          <input id="advanced" type="checkbox" />
+          <span class="switch-text">Advanced</span>
+        </label>
         <span id="connection" class="pill">offline</span>
         <button id="leave" class="btn small hidden" type="button">Leave</button>
       </span>
@@ -48,8 +52,8 @@
             <button type="submit" class="btn primary large">Join</button>
           </form>
           <p class="hint">
-            Testing alone? Open two tabs, join the same room, and send fixture A from one and
-            fixture B from the other.
+            Testing alone? Switch on Advanced, open two tabs in the same room, and send audio
+            file A from one and file B from the other.
           </p>
         </section>
         <section class="proof" aria-labelledby="proof-heading">
@@ -94,7 +98,7 @@
             <h2 id="input-heading">Your input</h2>
             <p class="where">In <strong id="session-room"></strong> as <strong id="session-name"></strong></p>
           </header>
-          <label class="field">
+          <label class="field advanced-only">
             <span>Input</span>
             <select id="input-kind">
               <option value="mic">Microphone</option>
@@ -104,7 +108,7 @@
           </label>
           <button id="mic-toggle" class="btn primary large" type="button">Start microphone</button>
           <div class="meter" aria-label="Input level"><div id="input-meter" class="meter-fill"></div></div>
-          <p id="capture-info" class="hint"></p>
+          <p id="capture-info" class="hint advanced-only"></p>
         </section>
 
         <section id="monitor-card" class="panel hidden" aria-labelledby="monitor-heading">
@@ -123,14 +127,14 @@
             You hear exactly what the backend receives: the final mix, including your own microphone
             about 150 ms late. For a natural listen, monitor from a device that is not recording.
           </p>
-          <dl class="stats">
+          <dl class="stats advanced-only">
             <div><dt>Dominant</dt><dd id="dominant">–</dd></div>
             <div><dt>Playback buffer</dt><dd id="playback-buffer">–</dd></div>
             <div><dt>Latency (estimate)</dt><dd id="latency">–</dd></div>
             <div><dt>Playback underruns</dt><dd id="playback-underruns">0</dd></div>
             <div><dt>Mixed frames</dt><dd id="sequence">0</dd></div>
           </dl>
-          <label class="field">
+          <label class="field advanced-only">
             <span>Mix strategy</span>
             <select id="strategy">
               <option value="gain-sharing">Gain sharing (default)</option>
@@ -162,7 +166,7 @@
           <ul id="participants" class="participants"></ul>
         </section>
 
-        <section id="network-card" class="panel hidden" aria-labelledby="network-heading">
+        <section id="network-card" class="panel hidden advanced-only" aria-labelledby="network-heading">
           <header class="panel-head">
             <h2 id="network-heading">Network simulation</h2>
             <p class="hint">Applied to this device's outgoing audio only.</p>

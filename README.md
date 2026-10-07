@@ -44,12 +44,19 @@ pnpm build
 pnpm start
 ```
 
-Open http://localhost:8080 in two tabs. Use the same room name in both, pick
-"Audio file: device A" as the input in one tab and "device B" in the other,
-and press Start in both. In one tab press "Play mix" (use headphones) and
-watch the participant list: the talker's device shows the higher gain, the
-other device is turned down, and the gains always add up to 100 %. Switch the
-strategy to "Plain sum" to hear the difference.
+Open http://localhost:8080 in two tabs. Switch on "Advanced" in the top bar
+of both, use the same room name, pick "Audio file: device A" as the input in
+one tab and "device B" in the other, and press Start in both. In one tab press
+"Play mix" (use headphones) and watch the participant list: the talker's
+device shows the higher gain, the other device is turned down, and the gains
+always add up to 100 %. Switch the strategy to "Plain sum" to hear the
+difference.
+
+The page opens in its simple view: join, start the microphone, play, record.
+The "Advanced" switch reveals the input source (microphone or the two fixture
+clips), capture details, the per-device figures, the monitor statistics, the
+strategy toggle and the network simulation. Switching it off resets the
+strategy to gain sharing and clears the network simulation.
 
 Or with Docker:
 
@@ -88,13 +95,14 @@ front of it (any reverse proxy or ingress) when deploying.
   sharing it always adds up to 100 % and re-balances as the dominant device
   changes; with plain sum the caption says what the gains add up to instead.
 - **Participants**: name, state (`joining`, `live`, `stalled`, `idle`, `left`),
-  live level meter, current gain, jitter buffer depth, underruns and drops. The
-  dominant source is highlighted.
+  live level meter, and with Advanced on the current gain, jitter buffer depth,
+  underruns and drops. The dominant source is highlighted.
 - **Monitor**: playback of the mixed stream (off by default), output meter,
-  playback buffer depth and underruns, the strategy toggle, and a recorder that
-  plays the recording back in the page or downloads it as a 16 kHz WAV.
-- **Network simulation**: added delay, jitter and dropped chunks on this
-  device's uplink, to watch the jitter buffer and counters react.
+  and a recorder that plays the recording back in the page or downloads it as
+  a 16 kHz WAV; with Advanced on, the playback buffer depth and underruns, the
+  latency estimate and the strategy toggle (gain sharing by default).
+- **Network simulation** (Advanced): added delay, jitter and dropped chunks on
+  this device's uplink, to watch the jitter buffer and counters react.
 - Every failure (microphone blocked, no microphone, connection lost, room full,
   joined from another tab) shows a plain message and a button that does the
   obvious next thing.
