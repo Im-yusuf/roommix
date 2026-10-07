@@ -15,12 +15,12 @@
     "format": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "mix": "tsx --tsconfig packages/cli/tsconfig.json packages/cli/src/cli.ts",
+    "mix": "tsx --tsconfig advanced/cli/tsconfig.json advanced/cli/src/cli.ts",
     "dev": "pnpm -r --parallel dev",
-    "start": "node packages/server/dist/main.js",
+    "start": "node server/dist/main.js",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "release:server": "gcloud run deploy f2f-audio-mixer --source . --project f2f-audio-mixer --region europe-west1 --allow-unauthenticated --port 8080 --memory 512Mi --max-instances 1 --session-affinity --timeout 3600 --quiet",
-    "release:web": "VITE_WS_URL=\"wss://$(gcloud run services describe f2f-audio-mixer --project f2f-audio-mixer --region europe-west1 --format 'value(status.url)' | sed 's#^https://##')/ws\" pnpm --filter @roommix/simulator build && firebase deploy --only hosting --project f2f-audio-mixer",
+    "release:server": "gcloud builds submit --config advanced/deploy/cloudbuild.yaml --project f2f-audio-mixer --region europe-west1 . && gcloud run deploy roommix --image europe-west1-docker.pkg.dev/f2f-audio-mixer/cloud-run-source-deploy/roommix:latest --project f2f-audio-mixer --region europe-west1 --allow-unauthenticated --port 8080 --memory 512Mi --max-instances 1 --session-affinity --timeout 3600 --quiet",
+    "release:web": "VITE_WS_URL=\"wss://$(gcloud run services describe roommix --project f2f-audio-mixer --region europe-west1 --format 'value(status.url)' | sed 's#^https://##')/ws\" pnpm --filter @roommix/simulator build && rm -rf advanced/deploy/public && cp -R simulator/dist advanced/deploy/public && firebase deploy --only hosting --project f2f-audio-mixer --config advanced/deploy/firebase.json",
     "release": "pnpm release:server && pnpm release:web"
   },
   "devDependencies": {

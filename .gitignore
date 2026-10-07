@@ -7,3 +7,4 @@ out/
 .env
 .env.*
 .firebase/
+advanced/deploy/public/

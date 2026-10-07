@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"],
-    "paths": { "@roommix/core": ["../core/src/index.ts"] }
+    "paths": { "@roommix/core": ["../../core/src/index.ts"] }
   },
   "include": ["src", "test"]
 }

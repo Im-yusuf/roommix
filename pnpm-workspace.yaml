@@ -1,6 +1,8 @@
 packages:
-  - packages/*
-  - apps/*
+  - core
+  - server
+  - simulator
+  - advanced/cli
 
 # esbuild's postinstall only verifies its native binary; nothing else may run install scripts.
 allowBuilds:

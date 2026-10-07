@@ -1,5 +1,5 @@
-import deviceAUrl from '../../../../fixtures/deviceA.wav?url';
-import deviceBUrl from '../../../../fixtures/deviceB.wav?url';
+import deviceAUrl from '../../../fixtures/deviceA.wav?url';
+import deviceBUrl from '../../../fixtures/deviceB.wav?url';
 import captureWorkletUrl from './worklets/capture-processor.ts?worker&url';
 
 export type InputKind = 'mic' | 'fileA' | 'fileB';

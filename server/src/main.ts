@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from './server.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const defaultStatic = resolve(here, '../../../apps/simulator/dist');
+const defaultStatic = resolve(here, '../../simulator/dist');
 const staticDir = process.env.STATIC_DIR ?? (existsSync(defaultStatic) ? defaultStatic : undefined);
 
 const server = await startServer({

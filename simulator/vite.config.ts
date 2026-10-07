@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: process.env.HTTPS ? [basicSsl()] : [],
   resolve: {
     alias: {
-      '@roommix/core': fileURLToPath(new URL('../../packages/core/src/index.ts', import.meta.url)),
+      '@roommix/core': fileURLToPath(new URL('../core/src/index.ts', import.meta.url)),
     },
   },
   server: {

@@ -196,8 +196,9 @@ deployment, which keeps the Dockerfile and the quick start short.
 ## Simulator
 
 **Vanilla TypeScript for the simulator.** The page is static HTML plus one
-`render(state)` function; about 700 lines in all. A framework would add a
-build-time dependency, a mental model to explain, and nothing the page needs.
+`render(state)` function; about 1,250 lines of TypeScript and one stylesheet.
+A framework would add a build-time dependency, a mental model to explain, and
+nothing the page needs.
 
 **Reconnect with backoff; the join is replayed with the known id.** The server
 then replaces the old participant and the tab re-announces its source and
@@ -237,6 +238,31 @@ when the monitor plays through speakers anyway.
 this client's outgoing chunks, in order, so the jitter buffer, stall handling
 and underrun counters can be exercised without a bad network.
 
+**One look, dark, with one accent.** The page is a monochrome product surface:
+near-white on near-black, hairline panels, Geist self-hosted from the
+repository, tabular figures everywhere, and a single blue reserved for the
+primary action and the "live" mark. Errors and "on" controls invert instead of
+adding colours. The gain-share bar is the page's thesis: one bar split between
+the devices that always adds up to 100 % with gain sharing, so the mechanism is
+visible without reading a number. Participant rows and bar segments are keyed
+by client so meters animate in place instead of being rebuilt ten times a
+second. `simulator/DESIGN.md` records the system.
+
+**Simple by default, analytics behind an Advanced switch.** A reviewer's first
+run needs join, start, play and record. Everything that explains the mechanism
+in numbers (input source with the fixture clips, capture details, per-device
+figures, monitor statistics, strategy, network simulation) sits behind one
+switch in the top strip. Switching it off resets what it hides, so no setting
+keeps acting on the session out of sight.
+
+**Deployed as two pieces.** Firebase Hosting serves the built page and Cloud
+Run runs the server from the Dockerfile; the page is built with the server's
+WebSocket address (`VITE_WS_URL`) so it can live on a static host. The service
+is pinned to one instance because rooms live in memory; Cloud Run's one-hour
+WebSocket limit is covered by the client's reconnect and join replay. Rooms in
+a database or a pub/sub fan-out would allow more instances and were not needed
+for a demo.
+
 ## Testing
 
 **A simulation harness drives every integration test.** `simulate()` in the test helpers feeds the mixer with a fake clock: every 20 ms each live source renders exactly the audio covering that interval at its own rate (with an optional clock error), chunks arrive after an optional seeded network delay, sources join, stall and leave at given times, and the mixer ticks once. Thirty simulated minutes run in about a second, and every quality and timing test is a few lines on top of it.
@@ -254,7 +280,7 @@ detected as sample-to-sample jumps above 1.5× the test tone's own slope.
 ## Edge cases, one by one
 
 Every edge case from the brief, with the test that covers it or the decision
-that answers it. Test names are `describe > it` titles in `packages/*/test`.
+that answers it. Test names are `describe > it` titles in each package's `test/`.
 
 | edge case | covered by |
 |---|---|

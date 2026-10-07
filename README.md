@@ -10,13 +10,22 @@ two tabs), join the same room, and press Start microphone on each.
 
 Three parts, one repository:
 
-| package | what it is |
+| folder | what it is |
 |---|---|
-| `@roommix/core` | the mixer as a pure TypeScript library: PCM in at any rate, mixed PCM16 frames out. Zero runtime dependencies, no sockets, no timers. |
-| `@roommix/server` | a thin WebSocket adapter: rooms, one mixer per room, fan-out of the mixed stream. Also serves the simulator. |
-| simulator | a single web page to join, record, listen and download the mix from several devices or tabs. |
+| `core/` | `@roommix/core`, the mixer as a pure TypeScript library: PCM in at any rate, mixed PCM16 frames out. Zero runtime dependencies, no sockets, no timers. |
+| `server/` | `@roommix/server`, a thin WebSocket adapter: rooms, one mixer per room, fan-out of the mixed stream. Also serves the simulator. |
+| `simulator/` | a single web page to join, record, listen and download the mix from several devices or tabs. |
 
-Plus `@roommix/cli`, which mixes WAV files offline through the same core.
+Those three are the essentials and were built in that order. Everything that
+came after lives under `advanced/`:
+
+| folder | what it is |
+|---|---|
+| `advanced/cli/` | `@roommix/cli`, which mixes WAV files offline through the same core. |
+| `advanced/deploy/` | the Dockerfile, the Cloud Build job and the Firebase Hosting config behind the live demo. |
+
+`fixtures/` holds the two synthesised test clips and the script that makes
+them; `.github/` runs the checks on every push.
 
 ## The problem it solves
 
@@ -64,7 +73,7 @@ strategy to gain sharing and clears the network simulation.
 Or with Docker:
 
 ```bash
-docker build -t roommix . && docker run --rm -p 8080:8080 roommix
+docker build -f advanced/deploy/Dockerfile -t roommix . && docker run --rm -p 8080:8080 roommix
 ```
 
 For development, `pnpm dev` runs the server with reload on port 8080 and the
@@ -90,12 +99,12 @@ Browsers only expose the microphone on a secure page, so a phone needs HTTPS:
 
 The live demo is two deployments from this repository:
 
-- **Cloud Run** runs the server from the `Dockerfile` (service
-  `f2f-audio-mixer`, region `europe-west1`). Rooms live in the server's memory,
+- **Cloud Run** runs the server from the `Dockerfile` (service `roommix`,
+  region `europe-west1`, project `f2f-audio-mixer`). Rooms live in the server's memory,
   so the service is pinned to one instance; Cloud Run gives it TLS, which is
   what lets phones use the microphone. It closes a WebSocket after an hour,
   and the page reconnects and rejoins on its own.
-- **Firebase Hosting** serves the built simulator from `apps/simulator/dist`.
+- **Firebase Hosting** serves the built simulator from `simulator/dist`.
   That build is told where the mixer lives through `VITE_WS_URL`, so the page
   opens its WebSocket straight to Cloud Run; without that variable the page
   connects to whatever host served it, which is what the Docker image and
@@ -146,7 +155,7 @@ Inputs are 16-bit PCM WAV at any rate, mono or stereo; the output is 16 kHz
 mono. The files are pushed 20 ms at a time against a simulated clock, so the
 same jitter buffers, resamplers and strategy run as on the server.
 
-The two fixture clips are synthesised speech (`scripts/make-fixtures.mjs`,
+The two fixture clips are synthesised speech (`fixtures/make-fixtures.mjs`,
 macOS only). Each clip is what one device would hear: its own speaker loud and
 the other speaker 10 dB quieter and 3 ms late. Device A is 48 kHz, device B is
 44.1 kHz.
@@ -184,7 +193,7 @@ Malformed input throws a `MixerError` with a stable `code`
 (`invalid_sample_rate`, `invalid_chunk`, `chunk_too_large`, `unknown_source`,
 `duplicate_source`, `unknown_strategy`). With no sources the mixer idles and
 emits nothing. All tunables live in
-[`packages/core/src/constants.ts`](packages/core/src/constants.ts).
+[`core/src/constants.ts`](core/src/constants.ts).
 
 ## Wire protocol
 
@@ -221,7 +230,7 @@ torn down when the last participant leaves.
 
 Server environment: `PORT` (default 8080), `HOST` (default 0.0.0.0),
 `STATIC_DIR` (directory with the built simulator; defaults to
-`apps/simulator/dist` when it exists).
+`simulator/dist` when it exists).
 
 Mixer options: `strategy` (`gain-sharing`), `jitterTargetMs` (60),
 `jitterMaxMs` (200). The remaining tunables are named constants:

@@ -5,11 +5,15 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     alias: {
-      '@roommix/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
+      '@roommix/core': fileURLToPath(new URL('./core/src/index.ts', import.meta.url)),
     },
   },
   test: {
-    include: ['packages/*/test/**/*.test.ts'],
+    include: [
+      'core/test/**/*.test.ts',
+      'server/test/**/*.test.ts',
+      'advanced/cli/test/**/*.test.ts',
+    ],
     testTimeout: 60_000,
   },
 });

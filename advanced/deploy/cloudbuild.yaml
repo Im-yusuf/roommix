@@ -1,0 +1,10 @@
+# Builds the server image from the repository root and pushes it for Cloud Run.
+# Run from the root: gcloud builds submit --config advanced/deploy/cloudbuild.yaml .
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'advanced/deploy/Dockerfile', '-t', '${_IMAGE}', '.']
+images: ['${_IMAGE}']
+substitutions:
+  _IMAGE: europe-west1-docker.pkg.dev/f2f-audio-mixer/cloud-run-source-deploy/roommix:latest
+options:
+  logging: CLOUD_LOGGING_ONLY
