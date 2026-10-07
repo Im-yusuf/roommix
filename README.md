@@ -95,34 +95,6 @@ Browsers only expose the microphone on a secure page, so a phone needs HTTPS:
    Playing the mix through speakers in the same room feeds it back into every
    microphone.
 
-## Deploying (Google Cloud)
-
-The live demo is two deployments from this repository:
-
-- **Cloud Run** runs the server from the `Dockerfile` (service `roommix`,
-  region `europe-west1`, project `f2f-audio-mixer`). Rooms live in the server's memory,
-  so the service is pinned to one instance; Cloud Run gives it TLS, which is
-  what lets phones use the microphone. It closes a WebSocket after an hour,
-  and the page reconnects and rejoins on its own.
-- **Firebase Hosting** serves the built simulator from `simulator/dist`.
-  That build is told where the mixer lives through `VITE_WS_URL`, so the page
-  opens its WebSocket straight to Cloud Run; without that variable the page
-  connects to whatever host served it, which is what the Docker image and
-  `pnpm start` rely on.
-
-With the `gcloud` and `firebase` CLIs signed in to a project that has billing:
-
-```bash
-pnpm release:server   # builds the image with Cloud Build and deploys the Cloud Run revision
-pnpm release:web      # builds the page against the Cloud Run URL and deploys Firebase Hosting
-```
-
-`pnpm release` runs both. (The scripts are not called `deploy` because pnpm
-has a built-in `deploy` command, which the Dockerfile uses.) The project and region are written into the scripts
-in `package.json` and `.firebaserc`; change them there for another project.
-Anywhere else, the production server speaks plain HTTP and WebSocket: put TLS
-termination in front of it (any reverse proxy or ingress).
-
 ## What the simulator shows
 
 - **Lobby**: what the service does in one sentence, the join form, and the
@@ -135,9 +107,11 @@ termination in front of it (any reverse proxy or ingress).
   live level meter, and with Advanced on the current gain, jitter buffer depth,
   underruns and drops. The dominant source is highlighted.
 - **Monitor**: playback of the mixed stream (off by default), output meter,
-  and a recorder that plays the recording back in the page or downloads it as
-  a 16 kHz WAV; with Advanced on, the playback buffer depth and underruns, the
-  latency estimate and the strategy toggle (gain sharing by default).
+  and a recorder. Stopped recordings are saved in the browser (IndexedDB, never
+  uploaded) and listed with play, download and delete; playback runs through
+  its own level meter so a saved session can be checked the way the live mix
+  is. With Advanced on: the playback buffer depth and underruns, the latency
+  estimate and the strategy toggle (gain sharing by default).
 - **Network simulation** (Advanced): added delay, jitter and dropped chunks on
   this device's uplink, to watch the jitter buffer and counters react.
 - Every failure (microphone blocked, no microphone, connection lost, room full,
