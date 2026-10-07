@@ -2,6 +2,14 @@ import type { RosterEntry } from '@roommix/server/protocol';
 import type { AppState } from '../state.js';
 import { $ } from './dom.js';
 
+type SavedRecording = AppState['monitor']['recordings'][number];
+
+/** The actions a dynamically rendered row can trigger. */
+export interface RowActions {
+  playRecording(id: number): void;
+  deleteRecording(id: number): void;
+}
+
 const INPUT_LABELS = { mic: 'microphone', fileA: 'file A', fileB: 'file B' } as const;
 const FACT_KEYS = ['gain', 'buffer', 'underruns', 'drops', 'skipped'] as const;
 
@@ -12,6 +20,14 @@ export function levelToPercent(rms: number): number {
   if (rms <= 0) return 0;
   const db = 20 * Math.log10(rms);
   return Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+}
+
+/** One saved recording, kept between renders like a participant row. */
+interface RecordingRow {
+  li: HTMLLIElement;
+  play: HTMLButtonElement;
+  download: HTMLAnchorElement;
+  fill: HTMLElement;
 }
 
 /** The fill stays full width and is clipped to the level, so a meter never re-lays out. */
@@ -45,7 +61,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
  * show state. Participant rows and gain-share segments are keyed by client so
  * their widths can transition instead of being rebuilt ten times a second.
  */
-export function createRenderer() {
+export function createRenderer(actions: RowActions) {
   const connection = $('connection');
   const advanced = $<HTMLInputElement>('advanced');
   const leave = $('leave');
@@ -74,9 +90,8 @@ export function createRenderer() {
   const sequence = $('sequence');
   const strategy = $<HTMLSelectElement>('strategy');
   const recordToggle = $<HTMLButtonElement>('record-toggle');
-  const download = $<HTMLAnchorElement>('download');
-  const recordingPlay = $<HTMLButtonElement>('recording-play');
-  const recordInfo = $('record-info');
+  const recordings = $<HTMLUListElement>('recordings');
+  const recordingsCount = $('recordings-count');
   const networkCard = $('network-card');
   const ranges = {
     delayMs: { input: $<HTMLInputElement>('delay'), output: $('delay-value'), unit: 'ms' },
@@ -86,6 +101,8 @@ export function createRenderer() {
 
   const rows = new Map<string, Row>();
   const segments = new Map<string, HTMLElement>();
+  const recordingRows = new Map<number, RecordingRow>();
+  let renderedRecordings: SavedRecording[] | null = null;
   let renderedRoster: RosterEntry[] | null = null;
   let renderedDominant: string | null = null;
   let renderedStrategy: AppState['strategy'] | null = null;
@@ -151,6 +168,67 @@ export function createRenderer() {
           : state.strategy === 'plain-sum'
             ? `adds up to ${Math.round(total * 100)} %: plain sum keeps every device at full gain`
             : `adds up to ${Math.round(total * 100)} %`;
+  }
+
+  function createRecordingRow(recording: SavedRecording): RecordingRow {
+    const li = el('li', 'recording');
+    const who = el('div', 'who');
+    const name = el('span', 'name');
+    name.textContent = recording.name;
+    const facts = el('span', 'facts');
+    facts.textContent = `${(recording.durationMs / 1000).toFixed(1)} s · ${Math.round(recording.bytes / 1024)} KB`;
+    who.append(name, facts);
+    const meter = el('div', 'meter');
+    meter.setAttribute('aria-label', 'Playback level');
+    const fill = el('div', 'meter-fill');
+    meter.append(fill);
+    const controls = el('div', 'row');
+    const play = el('button', 'btn small');
+    play.type = 'button';
+    play.onclick = () => actions.playRecording(recording.id);
+    const download = el('a', 'btn small');
+    download.textContent = 'Download WAV';
+    download.href = recording.url;
+    download.download = `roommix-${recording.name.replace(/[^\w.-]+/g, '-')}.wav`;
+    const remove = el('button', 'btn small');
+    remove.type = 'button';
+    remove.textContent = 'Delete';
+    remove.onclick = () => actions.deleteRecording(recording.id);
+    controls.append(play, download, remove);
+    li.append(who, meter, controls);
+    return { li, play, download, fill };
+  }
+
+  function syncRecordings(state: AppState): void {
+    const { recordings: list, playingRecording, recordingLevel } = state.monitor;
+    if (list !== renderedRecordings) {
+      renderedRecordings = list;
+      const seen = new Set<number>();
+      list.forEach((recording, index) => {
+        seen.add(recording.id);
+        let row = recordingRows.get(recording.id);
+        if (!row) {
+          row = createRecordingRow(recording);
+          recordingRows.set(recording.id, row);
+        }
+        if (recordings.children[index] !== row.li)
+          recordings.insertBefore(row.li, recordings.children[index] ?? null);
+      });
+      for (const [id, row] of recordingRows) {
+        if (seen.has(id)) continue;
+        row.li.remove();
+        recordingRows.delete(id);
+      }
+      recordingsCount.textContent =
+        list.length === 0 ? 'kept in this browser' : `${list.length} kept in this browser`;
+    }
+    for (const [id, row] of recordingRows) {
+      const playing = id === playingRecording;
+      row.li.classList.toggle('playing', playing);
+      row.play.classList.toggle('active', playing);
+      row.play.textContent = playing ? 'Pause' : 'Play';
+      setMeter(row.fill, playing ? recordingLevel : 0);
+    }
   }
 
   return function render(state: AppState): void {
@@ -230,17 +308,7 @@ export function createRenderer() {
       ? `Stop recording (${(state.monitor.recordedMs / 1000).toFixed(0)} s)`
       : 'Record mix';
     recordToggle.classList.toggle('active', state.monitor.recording);
-    download.classList.toggle('hidden', state.monitor.downloadUrl === null);
-    recordingPlay.classList.toggle('hidden', state.monitor.downloadUrl === null);
-    recordingPlay.textContent = state.monitor.playingRecording
-      ? 'Pause recording'
-      : 'Play recording';
-    recordingPlay.classList.toggle('active', state.monitor.playingRecording);
-    download.href = state.monitor.downloadUrl ?? '#';
-    recordInfo.textContent =
-      !state.monitor.recording && state.monitor.downloadUrl
-        ? `${(state.monitor.recordedMs / 1000).toFixed(1)} s of 16 kHz mono WAV`
-        : '';
+    syncRecordings(state);
 
     for (const [key, { input: range, output, unit }] of Object.entries(ranges)) {
       const value = state.net[key as keyof typeof ranges];

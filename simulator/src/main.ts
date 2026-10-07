@@ -7,7 +7,10 @@ import { createRenderer } from './ui/render.js';
 
 const store = createStore(initialState);
 const app = createApp(store);
-const render = createRenderer();
+const render = createRenderer({
+  playRecording: (id) => app.playRecording(id),
+  deleteRecording: (id) => app.deleteRecording(id),
+});
 store.subscribe(render);
 render(store.state);
 app.setAdvanced(localStorage.getItem('roommix:advanced') === '1');
@@ -28,7 +31,6 @@ $<HTMLSelectElement>('input-kind').onchange = (event) => {
 };
 $('play-toggle').onclick = () => void app.togglePlayback();
 $('record-toggle').onclick = () => app.toggleRecording();
-$('recording-play').onclick = () => app.toggleRecordingPlayback();
 $<HTMLSelectElement>('strategy').onchange = (event) => {
   app.setStrategy((event.target as HTMLSelectElement).value as StrategyName);
 };

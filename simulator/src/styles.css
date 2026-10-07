@@ -932,6 +932,49 @@ input[type="range"]:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* Saved recordings: kept in the browser, played back through a meter */
+
+.recordings-block {
+  display: grid;
+  gap: 8px;
+}
+
+.recordings {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recordings:empty::before {
+  content: "No saved recordings yet. Stop a recording and it appears here.";
+  display: block;
+  padding: 4px 0;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+
+.recording {
+  display: grid;
+  gap: 8px;
+  padding: 14px 0;
+}
+
+.recording + .recording {
+  border-top: 1px solid var(--line);
+}
+
+.recording:first-child {
+  padding-top: 2px;
+}
+
+.recording .facts {
+  flex: none;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* Monitor figures */
 
 .stats {

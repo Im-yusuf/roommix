@@ -3,6 +3,12 @@ import type { ServerMessage } from '@roommix/server/protocol';
 import { type Capture, CaptureError, type InputKind, startCapture } from './audio/capture.js';
 import { type Playback, startPlayback } from './audio/playback.js';
 import { createRecorder } from './audio/recorder.js';
+import {
+  deleteRecording as deleteStored,
+  listRecordings,
+  type StoredRecording,
+  saveRecording,
+} from './audio/recordings.js';
 import { createClient } from './client.js';
 import { createNetworkSimulator, type NetworkSettings } from './net-sim.js';
 import type { Notice, Store } from './state.js';
@@ -27,10 +33,32 @@ export function createApp(store: Store) {
   let playback: Playback | null = null;
   const recorder = createRecorder();
   const recordingPlayer = new Audio();
-  recordingPlayer.addEventListener('ended', () => {
-    store.update((st) => ({ monitor: { ...st.monitor, playingRecording: false } }));
-  });
+  recordingPlayer.addEventListener('ended', () => stopRecordingPlayback());
   let lastRecordedUpdate = 0;
+  /** Playback runs through an analyser so the page can meter it like the live mix. */
+  let playbackMeter: {
+    context: AudioContext;
+    analyser: AnalyserNode;
+    samples: Float32Array<ArrayBuffer>;
+  } | null = null;
+  let meterTimer: ReturnType<typeof setInterval> | null = null;
+  /** True when IndexedDB refused; recordings then last only until the page is closed. */
+  let storageUnavailable = false;
+
+  const describeRecording = (stored: StoredRecording) => {
+    const { blob, ...recording } = stored;
+    return { ...recording, url: URL.createObjectURL(blob) };
+  };
+
+  void listRecordings()
+    .then((stored) => {
+      store.update((st) => ({
+        monitor: { ...st.monitor, recordings: stored.map(describeRecording) },
+      }));
+    })
+    .catch(() => {
+      storageUnavailable = true;
+    });
 
   const notify = (notice: Notice | null) => store.update({ notice });
   const storageKey = (room: string) => `roommix:${room}`;
@@ -243,39 +271,101 @@ export function createApp(store: Store) {
   function toggleRecording(): void {
     const { monitor } = store.state;
     if (monitor.recording) {
-      if (monitor.downloadUrl) URL.revokeObjectURL(monitor.downloadUrl);
-      const downloadUrl = URL.createObjectURL(recorder.toBlob());
-      store.update({
-        monitor: { ...monitor, recording: false, recordedMs: recorder.durationMs, downloadUrl },
-      });
+      store.update({ monitor: { ...monitor, recording: false, recordedMs: recorder.durationMs } });
+      void keepRecording();
     } else {
       stopRecordingPlayback();
       recorder.clear();
-      store.update((st) => ({
-        monitor: { ...st.monitor, recording: true, recordedMs: 0, downloadUrl: null },
-      }));
+      store.update((st) => ({ monitor: { ...st.monitor, recording: true, recordedMs: 0 } }));
     }
     syncSubscription();
   }
 
-  function toggleRecordingPlayback(): void {
+  /** The stopped recording goes into the browser's storage and to the top of the list. */
+  async function keepRecording(): Promise<void> {
+    if (recorder.durationMs === 0) return;
+    const blob = recorder.toBlob();
+    const draft = {
+      name: `${store.state.room || 'mix'} · ${new Date().toLocaleTimeString()}`,
+      createdAt: Date.now(),
+      durationMs: recorder.durationMs,
+      bytes: blob.size,
+      blob,
+    };
+    let stored: StoredRecording;
+    try {
+      stored = await saveRecording(draft);
+    } catch {
+      // No IndexedDB (private browsing, old browser): keep it for this page's lifetime.
+      stored = { ...draft, id: -Date.now() };
+      if (!storageUnavailable) {
+        storageUnavailable = true;
+        notify({
+          tone: 'info',
+          message: 'This browser cannot store recordings; this one lasts until the page is closed.',
+        });
+      }
+    }
+    store.update((st) => ({
+      monitor: { ...st.monitor, recordings: [describeRecording(stored), ...st.monitor.recordings] },
+    }));
+  }
+
+  function playRecording(id: number): void {
     const { monitor } = store.state;
-    if (monitor.playingRecording) {
+    if (monitor.playingRecording === id) {
       stopRecordingPlayback();
       return;
     }
-    if (!monitor.downloadUrl) return;
-    if (recordingPlayer.src !== monitor.downloadUrl) recordingPlayer.src = monitor.downloadUrl;
+    const recording = monitor.recordings.find((r) => r.id === id);
+    if (!recording) return;
+    stopRecordingPlayback();
+    if (!playbackMeter) {
+      const context = new AudioContext();
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      context.createMediaElementSource(recordingPlayer).connect(analyser);
+      analyser.connect(context.destination);
+      playbackMeter = { context, analyser, samples: new Float32Array(analyser.fftSize) };
+    }
+    void playbackMeter.context.resume();
+    recordingPlayer.src = recording.url;
     void recordingPlayer.play();
-    store.update({ monitor: { ...monitor, playingRecording: true } });
+    store.update({ monitor: { ...monitor, playingRecording: id, recordingLevel: 0 } });
+    meterTimer = setInterval(() => {
+      if (!playbackMeter) return;
+      playbackMeter.analyser.getFloatTimeDomainData(playbackMeter.samples);
+      let sum = 0;
+      for (const sample of playbackMeter.samples) sum += sample * sample;
+      const rms = Math.sqrt(sum / playbackMeter.samples.length);
+      store.update((st) => ({ monitor: { ...st.monitor, recordingLevel: rms } }));
+    }, 50);
   }
 
   function stopRecordingPlayback(): void {
     recordingPlayer.pause();
     recordingPlayer.currentTime = 0;
-    if (store.state.monitor.playingRecording) {
-      store.update((st) => ({ monitor: { ...st.monitor, playingRecording: false } }));
+    if (meterTimer !== null) {
+      clearInterval(meterTimer);
+      meterTimer = null;
     }
+    if (store.state.monitor.playingRecording !== null) {
+      store.update((st) => ({
+        monitor: { ...st.monitor, playingRecording: null, recordingLevel: 0 },
+      }));
+    }
+  }
+
+  function deleteRecording(id: number): void {
+    const { monitor } = store.state;
+    const recording = monitor.recordings.find((r) => r.id === id);
+    if (!recording) return;
+    if (monitor.playingRecording === id) stopRecordingPlayback();
+    URL.revokeObjectURL(recording.url);
+    store.update((st) => ({
+      monitor: { ...st.monitor, recordings: st.monitor.recordings.filter((r) => r.id !== id) },
+    }));
+    if (id > 0) void deleteStored(id).catch(() => undefined);
   }
 
   function setStrategy(name: StrategyName): void {
@@ -308,7 +398,8 @@ export function createApp(store: Store) {
     setInputKind,
     togglePlayback,
     toggleRecording,
-    toggleRecordingPlayback,
+    playRecording,
+    deleteRecording,
     setStrategy,
     setNetwork,
     setAdvanced,

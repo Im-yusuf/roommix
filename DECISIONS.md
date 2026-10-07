@@ -255,6 +255,13 @@ figures, monitor statistics, strategy, network simulation) sits behind one
 switch in the top strip. Switching it off resets what it hides, so no setting
 keeps acting on the session out of sight.
 
+**Recordings stay in the browser.** A stopped recording is written to
+IndexedDB and listed under the monitor with play, download and delete, so a test
+session can be replayed after a reload without any upload, storage bucket or
+account. Playback goes through an analyser node so it has a level meter like
+the live mix. If the browser refuses storage the recording still lives until
+the page closes, and the page says so.
+
 **Deployed as two pieces.** Firebase Hosting serves the built page and Cloud
 Run runs the server from the Dockerfile; the page is built with the server's
 WebSocket address (`VITE_WS_URL`) so it can live on a static host. The service

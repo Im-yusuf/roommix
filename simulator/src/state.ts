@@ -1,6 +1,7 @@
 import type { StrategyName } from '@roommix/core';
 import type { RosterEntry } from '@roommix/server/protocol';
 import type { InputKind } from './audio/capture.js';
+import type { SavedRecording } from './audio/recordings.js';
 import type { ConnectionStatus } from './client.js';
 import type { NetworkSettings } from './net-sim.js';
 
@@ -29,13 +30,17 @@ export interface AppState {
   monitor: {
     playing: boolean;
     recording: boolean;
-    /** The finished recording is playing back in the page. */
-    playingRecording: boolean;
     outputLevel: number;
     bufferMs: number;
     underruns: number;
+    /** Length of the recording in progress. */
     recordedMs: number;
-    downloadUrl: string | null;
+    /** Saved in this browser, newest first; each carries an object URL for playback and download. */
+    recordings: (SavedRecording & { url: string })[];
+    /** Id of the saved recording playing back in the page, if any. */
+    playingRecording: number | null;
+    /** Level of that playback, so it can be watched like the live mix. */
+    recordingLevel: number;
   };
   net: NetworkSettings;
   notice: Notice | null;
@@ -60,12 +65,13 @@ export const initialState: AppState = {
   monitor: {
     playing: false,
     recording: false,
-    playingRecording: false,
     outputLevel: 0,
     bufferMs: 0,
     underruns: 0,
     recordedMs: 0,
-    downloadUrl: null,
+    recordings: [],
+    playingRecording: null,
+    recordingLevel: 0,
   },
   net: { delayMs: 0, jitterMs: 0, dropPercent: 0 },
   notice: null,
