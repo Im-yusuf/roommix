@@ -264,6 +264,8 @@ reconnect-replaces, slow subscribers and heartbeats on the server.
   alignment or separation, which are out of scope.
 - No listening test was done; all quality claims are measurements on tones and
   noise.
+- The leveler needs one to two seconds after a turn change to settle, so the
+  first words of a quiet talker after a loud one come through a little low.
 - The limiter has no lookahead, so a sudden overload clamps during its first
   ramp. With gain sharing the mix gains sum to one and the limiter rarely acts.
 - The resampler holds back the last ~1.7 ms of a stream (filter lookahead), so

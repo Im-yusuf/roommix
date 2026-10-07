@@ -212,7 +212,7 @@ deployment, which keeps the Dockerfile and the quick start short.
 ## Simulator
 
 **Vanilla TypeScript for the simulator.** The page is static HTML plus one
-`render(state)` function; about 1,250 lines of TypeScript and one stylesheet.
+`render(state)` function; about 1,350 lines of TypeScript and one stylesheet.
 A framework would add a build-time dependency, a mental model to explain, and
 nothing the page needs.
 
