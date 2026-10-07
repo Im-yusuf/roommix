@@ -27,6 +27,8 @@ export interface AppState {
   dominant: string | null;
   strategy: StrategyName;
   sequence: number;
+  /** What the server's leveler is applying to the mix, in dB. */
+  levelerDb: number;
   monitor: {
     playing: boolean;
     recording: boolean;
@@ -62,6 +64,7 @@ export const initialState: AppState = {
   dominant: null,
   strategy: 'gain-sharing',
   sequence: 0,
+  levelerDb: 0,
   monitor: {
     playing: false,
     recording: false,

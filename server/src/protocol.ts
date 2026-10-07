@@ -60,6 +60,8 @@ export type ServerMessage =
       dominant: string | null;
       strategy: StrategyName;
       sequence: number;
+      /** What the leveler is applying to the mix right now, in dB. */
+      levelerDb: number;
     }
   | { type: 'error'; code: ErrorCode; message: string; fatal: boolean };
 

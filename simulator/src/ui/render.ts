@@ -88,6 +88,7 @@ export function createRenderer(actions: RowActions) {
   const latency = $('latency');
   const playbackUnderruns = $('playback-underruns');
   const sequence = $('sequence');
+  const leveler = $('leveler');
   const strategy = $<HTMLSelectElement>('strategy');
   const recordToggle = $<HTMLButtonElement>('record-toggle');
   const recordings = $<HTMLUListElement>('recordings');
@@ -302,6 +303,7 @@ export function createRenderer(actions: RowActions) {
       : '–';
     playbackUnderruns.textContent = String(state.monitor.underruns);
     sequence.textContent = String(state.sequence);
+    leveler.textContent = `${state.levelerDb > 0 ? '+' : ''}${state.levelerDb.toFixed(1)} dB`;
     if (strategy.value !== state.strategy) strategy.value = state.strategy;
 
     recordToggle.textContent = state.monitor.recording

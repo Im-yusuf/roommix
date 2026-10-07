@@ -9,9 +9,9 @@ describe('strategies', () => {
     const gains: number[] = [];
     gainSharing.computeGains(
       [
-        { level: 0.3, floor: 0.1 },
-        { level: 0.2, floor: 0.1 },
-        { level: 0.05, floor: 0.1 },
+        { level: 0.3, floor: 0.1, raw: 0.3 },
+        { level: 0.2, floor: 0.1, raw: 0.2 },
+        { level: 0.05, floor: 0.1, raw: 0.05 },
       ],
       gains,
     );
@@ -25,8 +25,8 @@ describe('strategies', () => {
     const gains: number[] = [];
     gainSharing.computeGains(
       [
-        { level: 1e-6, floor: 1e-6 },
-        { level: 1e-6, floor: 1e-6 },
+        { level: 1e-6, floor: 1e-6, raw: 1e-6 },
+        { level: 1e-6, floor: 1e-6, raw: 1e-6 },
       ],
       gains,
     );
@@ -37,8 +37,8 @@ describe('strategies', () => {
     const gains: number[] = [];
     plainSum.computeGains(
       [
-        { level: 1, floor: 0 },
-        { level: 0, floor: 0 },
+        { level: 1, floor: 0, raw: 1 },
+        { level: 0, floor: 0, raw: 0 },
       ],
       gains,
     );

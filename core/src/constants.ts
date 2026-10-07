@@ -71,6 +71,24 @@ export const GAIN_SMOOTHING_MS = 20;
 /** A new source becomes "dominant" only when it beats the current one by this much. */
 export const DOMINANT_HYSTERESIS_DB = 3;
 
+// ---- Leveler ------------------------------------------------------------
+/** The mix is brought towards this loudness while the dominant source carries sound. */
+export const LEVELER_TARGET_DBFS = -20;
+/** The leveler never boosts or cuts by more than this. */
+export const LEVELER_MAX_BOOST_DB = 12;
+export const LEVELER_MAX_CUT_DB = 12;
+/**
+ * A frame teaches the leveler only when its own RMS is this far above the
+ * dominant source's floor: pauses and the meter's release tail are far below
+ * that, steady noise sits on it, speech clears it.
+ */
+export const LEVELER_GATE_DB = 3;
+/** The learned loudness follows a louder talker this fast and a quieter one this slowly. */
+export const LEVELER_REFERENCE_ATTACK_MS = 200;
+export const LEVELER_REFERENCE_RELEASE_MS = 800;
+/** The applied gain follows its target with this time constant (in dB), ramped inside every frame. */
+export const LEVELER_SMOOTHING_MS = 300;
+
 // ---- Limiter ------------------------------------------------------------
 export const LIMITER_CEILING = 0.98;
 export const LIMITER_RELEASE_MS = 500;

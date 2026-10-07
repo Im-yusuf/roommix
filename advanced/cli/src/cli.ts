@@ -9,20 +9,23 @@ import {
 } from '@roommix/core';
 import { mixFiles } from './mix-files.js';
 
-const USAGE = `Usage: roommix-mix <input.wav> [more.wav ...] -o <output.wav> [--strategy ${STRATEGY_NAMES.join('|')}]
+const USAGE = `Usage: roommix-mix <input.wav> [more.wav ...] -o <output.wav> [--strategy ${STRATEGY_NAMES.join('|')}] [--no-leveler]
 
 Mixes 16-bit PCM WAV files (any rate, mono or stereo) into one 16 kHz mono WAV
-using the same core as the live service.`;
+using the same core as the live service. --no-leveler keeps the raw mix level,
+which is what the measurements in the tests look at.`;
 
 function main(argv: string[]): number {
   const inputs: string[] = [];
   let output: string | undefined;
   let strategy: StrategyName = 'gain-sharing';
+  let leveler = true;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '-o' || arg === '--output') output = argv[++i];
     else if (arg === '--strategy') strategy = argv[++i] as StrategyName;
+    else if (arg === '--no-leveler') leveler = false;
     else if (arg === '-h' || arg === '--help') {
       console.log(USAGE);
       return 0;
@@ -38,7 +41,7 @@ function main(argv: string[]): number {
   }
 
   const wavs = inputs.map((path) => decodeWav(new Uint8Array(readFileSync(path))));
-  const { pcm } = mixFiles(wavs, strategy);
+  const { pcm } = mixFiles(wavs, strategy, { leveler });
   writeFileSync(output, encodeWav(pcm, SAMPLE_RATE, 1));
 
   inputs.forEach((path, i) => {
@@ -47,7 +50,7 @@ function main(argv: string[]): number {
     console.log(`${path}: ${wav.sampleRate} Hz, ${wav.channels} ch, ${seconds.toFixed(2)} s`);
   });
   console.log(
-    `${output}: ${SAMPLE_RATE} Hz mono, ${(pcm.length / SAMPLE_RATE).toFixed(2)} s, strategy ${strategy}`,
+    `${output}: ${SAMPLE_RATE} Hz mono, ${(pcm.length / SAMPLE_RATE).toFixed(2)} s, strategy ${strategy}${leveler ? '' : ', leveler off'}`,
   );
   return 0;
 }

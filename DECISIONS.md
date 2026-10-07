@@ -117,6 +117,22 @@ means nobody's gain jumps when speech starts.
 
 **Gains are smoothed symmetrically (20 ms).** One coefficient in both directions keeps the smoothed gains summing to one even mid-transition; an asymmetric attack and release would let the sum exceed one during a handover. Flutter between two equal talkers is prevented upstream by the level meter's 300 ms release, not by slowing the gains. Within a frame the gain ramps per sample, so there are no steps.
 
+**A leveler after the mix, gated by the dominant source.** Devices differ in
+sensitivity and people in loudness, so the raw mix carried one talker much
+louder than the other. Automatic gain on each input (the browser's AGC
+included) would also lift the quiet copy of the other talker on that device,
+which is exactly what gain sharing relies on to suppress duplicates. So the
+leveler runs after the mix instead. While the dominant device carries sound
+(its frame is 3 dB above its own floor), the mix is measured and the whole of
+it is brought towards −20 dBFS, within ±12 dB; the measure follows a louder
+talker in 200 ms and a quieter one in 800 ms, and the gain moves in dB over
+300 ms and is ramped inside every frame. Gains are still computed from raw
+levels, so the duplicate stays suppressed. Pauses and the meter's release tail
+teach it nothing, so the gain holds through silence, and a device that is
+never dominant never speaks for the room. Two people talking at once still
+split by raw level, which is deliberate: that same rule is what picks the near
+copy.
+
 **Dominant source with 3 dB hysteresis.** The indicator only changes when a
 challenger is clearly ahead, so two equal talkers do not make it flicker.
 
@@ -297,6 +313,7 @@ that answers it. Test names are `describe > it` titles in each package's `test/`
 | mismatched mic sensitivity | test: the duplicate test uses one device 10 dB quieter; a more sensitive device simply carries more of the share, and the quieter copy of each voice is suppressed as the square of its ratio |
 | similar levels causing gain flutter | test: *mix quality > does not flutter when two sources sit at nearly the same level*; decision: level meter release and symmetric gain smoothing, dominant hysteresis |
 | noise build-up as sources increase | test: *mix quality > does not build up noise as sources are added* (eight sources: −8.9 dB) |
+| devices with different sensitivity, people with different loudness | decision: a bounded leveler after the mix, gated by the dominant source, so the output sits near −20 dBFS whoever is talking |
 | browser automatic gain control | decision: `autoGainControl: false`, `noiseSuppression: true` in the simulator's constraints |
 | monitor playback feeding back | decision: playback off by default, headphones warning, browser echo cancellation left on; the monitor is deliberately the full backend mix, see Simulator |
 | arrival jitter | test: *timing > absorbs arrival jitter and bounds latency after a stall and burst* |

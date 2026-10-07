@@ -41,6 +41,9 @@ Adding the samples together is not enough:
   talker's device dominates and the quieter copy is attenuated.
 - **Lifecycle.** Sources join, stall and vanish mid-stream. Each source has a
   state machine with fades at every seam; the mix never waits on a source.
+- **Loudness.** Devices differ in sensitivity and people in loudness. A
+  bounded leveler after the mix, gated by whichever device is dominant, brings
+  the output to a common level without touching the duplicate suppression.
 
 [DECISIONS.md](DECISIONS.md) records every significant choice, the
 alternatives, and what was deliberately left out.
@@ -111,7 +114,8 @@ Browsers only expose the microphone on a secure page, so a phone needs HTTPS:
   uploaded) and listed with play, download and delete; playback runs through
   its own level meter so a saved session can be checked the way the live mix
   is. With Advanced on: the playback buffer depth and underruns, the latency
-  estimate and the strategy toggle (gain sharing by default).
+  estimate, what the leveler is applying to the mix, and the strategy toggle
+  (gain sharing by default).
 - **Network simulation** (Advanced): added delay, jitter and dropped chunks on
   this device's uplink, to watch the jitter buffer and counters react.
 - Every failure (microphone blocked, no microphone, connection lost, room full,
@@ -190,7 +194,7 @@ Server to client:
 | message | fields | meaning |
 |---|---|---|
 | `joined` | `clientId`, `room`, `strategy` | always the first message after a join |
-| `roster` | `participants[]`, `dominant`, `strategy`, `sequence` | ten times a second; each participant has `state`, `level`, `gain`, `bufferMs`, `underruns`, `drops`, `skipped` |
+| `roster` | `participants[]`, `dominant`, `strategy`, `sequence`, `levelerDb` | ten times a second; each participant has `state`, `level`, `gain`, `bufferMs`, `underruns`, `drops`, `skipped` |
 | `error` | `code`, `message`, `fatal` | `bad_message`, `not_joined`, `no_source`, `invalid_audio`, `room_full` (fatal), `replaced` (fatal) |
 | binary | | 640 bytes = 20 ms of 16 kHz mono PCM16 little-endian, to subscribers only |
 
@@ -207,7 +211,7 @@ Server environment: `PORT` (default 8080), `HOST` (default 0.0.0.0),
 `simulator/dist` when it exists).
 
 Mixer options: `strategy` (`gain-sharing`), `jitterTargetMs` (60),
-`jitterMaxMs` (200). The remaining tunables are named constants:
+`jitterMaxMs` (200), `leveler` (on). The remaining tunables are named constants:
 
 | constant | value | role |
 |---|---|---|
@@ -219,6 +223,11 @@ Mixer options: `strategy` (`gain-sharing`), `jitterTargetMs` (60),
 | `FLOOR_RISE_DB_PER_S` / `FLOOR_MAX_DBFS` | 3 / −30 | noise floor tracker |
 | `GAIN_SMOOTHING_MS` | 20 | how fast gains follow the strategy |
 | `DOMINANT_HYSTERESIS_DB` | 3 | stability of the dominant indicator |
+| `LEVELER_TARGET_DBFS` | −20 | where the leveler brings the dominant talker |
+| `LEVELER_MAX_BOOST_DB` / `LEVELER_MAX_CUT_DB` | 12 / 12 | its bounds |
+| `LEVELER_GATE_DB` | 3 | a frame counts as sound this far above the floor |
+| `LEVELER_REFERENCE_ATTACK_MS` / `LEVELER_REFERENCE_RELEASE_MS` | 200 / 800 | how fast the measure follows a louder, then a quieter talker |
+| `LEVELER_SMOOTHING_MS` | 300 | how fast the gain moves |
 | `LIMITER_CEILING` / `LIMITER_RELEASE_MS` | 0.98 / 500 | output limiter |
 | `MAX_CATCHUP_MS` | 1 000 | frames skipped instead of burst after a host stall |
 

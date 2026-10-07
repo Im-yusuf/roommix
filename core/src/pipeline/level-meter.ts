@@ -12,11 +12,18 @@ export interface LevelReading {
   level: number;
   /** Tracked noise floor in the same units. */
   floor: number;
+  /** This frame's RMS before smoothing: it drops the moment the sound stops, the level does not. */
+  raw: number;
 }
 
 /** Amplitude ratio for a level in dB: +6 dB ≈ ×2, −20 dB = ×0.1. */
 export function dbToLinear(db: number): number {
   return 10 ** (db / 20);
+}
+
+/** Level in dB for an amplitude ratio; the inverse of dbToLinear, floored at −180 dB for silence. */
+export function linearToDb(linear: number): number {
+  return 20 * Math.log10(Math.max(linear, 1e-9));
 }
 
 /** Root mean square: the average loudness of a frame, 0 for silence, ~0.707 for a full-scale sine. */
@@ -45,10 +52,12 @@ const FLOOR_MAX = dbToLinear(FLOOR_MAX_DBFS);
 export function createLevelMeter() {
   let level = 0;
   let floor = FLOOR_MIN;
+  let raw = 0;
 
   return {
     update(frame: Float32Array): LevelReading {
       const current = rms(frame);
+      raw = current;
       // Rising: follow quickly (attack). Falling: let go slowly (release).
       level += (current - level) * (current > level ? ATTACK : RELEASE);
       // Below the floor: the floor jumps down to it. Otherwise: creep up, never past the cap.
@@ -56,10 +65,10 @@ export function createLevelMeter() {
         level < floor
           ? Math.max(level, FLOOR_MIN)
           : Math.min(floor * FLOOR_RISE_PER_FRAME, FLOOR_MAX);
-      return { level, floor };
+      return { level, floor, raw };
     },
     get reading(): LevelReading {
-      return { level, floor };
+      return { level, floor, raw };
     },
   };
 }

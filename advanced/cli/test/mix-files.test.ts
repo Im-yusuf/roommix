@@ -34,7 +34,7 @@ describe('mixFiles', () => {
   it('mixes files of different rates and channel counts into 16 kHz mono', () => {
     const a = toneWav(440, 48000, 2.0);
     const b = toneWav(1500, 44100, 1.0, 2);
-    const { pcm, stats } = mixFiles([a, b]);
+    const { pcm, stats } = mixFiles([a, b], 'gain-sharing', { leveler: false });
 
     const seconds = pcm.length / 16000;
     expect(seconds).toBeGreaterThan(2.0);
@@ -53,7 +53,17 @@ describe('mixFiles', () => {
 
   it('supports the plain-sum baseline', () => {
     const a = toneWav(440, 16000, 0.5);
-    const { pcm } = mixFiles([a, a], 'plain-sum');
+    const { pcm } = mixFiles([a, a], 'plain-sum', { leveler: false });
     expect(toneLevel(pcm, 440, 2000, 7000)).toBeGreaterThan(0.5);
+  });
+
+  it('levels the output by default, as the live service does', () => {
+    const a = toneWav(440, 16000, 2.0); // -13.5 dBFS, louder than the leveler's target
+    const raw = toneLevel(mixFiles([a], 'gain-sharing', { leveler: false }).pcm, 440, 16000, 30000);
+    const leveled = toneLevel(mixFiles([a]).pcm, 440, 16000, 30000);
+    expect(raw).toBeGreaterThan(0.25);
+    // -20 dBFS RMS is an amplitude of about 0.14.
+    expect(leveled).toBeGreaterThan(0.1);
+    expect(leveled).toBeLessThan(0.2);
   });
 });

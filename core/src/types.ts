@@ -20,6 +20,13 @@ export interface SourceOptions {
 export interface MixerOptions {
   /** Default 'gain-sharing'. */
   strategy?: StrategyName;
+  /**
+   * Level the mix after the strategy: while the dominant source carries sound,
+   * the mix is brought towards LEVELER_TARGET_DBFS, within LEVELER_MAX_BOOST_DB
+   * and LEVELER_MAX_CUT_DB. Default true. Off, the mix is the plain weighted
+   * sum, which is what the measurements in the tests use.
+   */
+  leveler?: boolean;
   /** Default JITTER_TARGET_MS. */
   jitterTargetMs?: number;
   /** Default JITTER_MAX_MS. */
@@ -56,6 +63,8 @@ export interface MixedFrame {
   dominant: string | null;
   sources: SourceSnapshot[];
   limiterGain: number;
+  /** Linear gain the leveler applied to this frame; 1 when it is off or has nothing to go on. */
+  levelerGain: number;
 }
 
 export interface MixerEvents extends Record<string, unknown> {

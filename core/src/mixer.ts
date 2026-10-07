@@ -5,15 +5,22 @@ import {
   GAIN_SMOOTHING_MS,
   JITTER_MAX_MS,
   JITTER_TARGET_MS,
+  LEVELER_GATE_DB,
+  LEVELER_MAX_BOOST_DB,
+  LEVELER_MAX_CUT_DB,
+  LEVELER_REFERENCE_ATTACK_MS,
+  LEVELER_REFERENCE_RELEASE_MS,
+  LEVELER_SMOOTHING_MS,
+  LEVELER_TARGET_DBFS,
   MAX_CATCHUP_MS,
   STATS_INTERVAL_MS,
 } from './constants.js';
 import { createEmitter } from './emitter.js';
 import { MixerError } from './errors.js';
-import { addWithGainRamp } from './mix/gain-ramp.js';
+import { addWithGainRamp, applyGainRamp } from './mix/gain-ramp.js';
 import { createLimiter } from './mix/limiter.js';
 import { strategyByName } from './mix/strategies.js';
-import { dbToLinear } from './pipeline/level-meter.js';
+import { createLevelMeter, dbToLinear, linearToDb } from './pipeline/level-meter.js';
 import { floatToPcm16 } from './pipeline/pcm.js';
 import { createSource, type Source } from './source.js';
 import type {
@@ -33,6 +40,10 @@ const GAIN_SMOOTHING = 1 - Math.exp(-FRAME_MS / GAIN_SMOOTHING_MS);
 /** A challenger must have this many times the current dominant's activity to take over. */
 const DOMINANT_RATIO = dbToLinear(DOMINANT_HYSTERESIS_DB);
 const MAX_CATCHUP_FRAMES = MAX_CATCHUP_MS / FRAME_MS;
+const LEVELER_SMOOTHING = 1 - Math.exp(-FRAME_MS / LEVELER_SMOOTHING_MS);
+const LEVELER_GATE = dbToLinear(LEVELER_GATE_DB);
+const REFERENCE_ATTACK = 1 - Math.exp(-FRAME_MS / LEVELER_REFERENCE_ATTACK_MS);
+const REFERENCE_RELEASE = 1 - Math.exp(-FRAME_MS / LEVELER_REFERENCE_RELEASE_MS);
 const STATS_INTERVAL_FRAMES = STATS_INTERVAL_MS / FRAME_MS;
 
 /**
@@ -46,6 +57,15 @@ export function createMixer(options: MixerOptions = {}): Mixer {
     maxMs: options.jitterMaxMs ?? JITTER_MAX_MS,
   };
   let strategy = strategyByName(options.strategy ?? 'gain-sharing');
+  const leveler = options.leveler ?? true;
+  // The leveler listens to the mix before its own gain: a level meter on it, the
+  // loudness it has learned (dB, null until heard) and the gain in dB, which
+  // stays at 0 until then.
+  const mixMeter = createLevelMeter();
+  let referenceDb: number | null = null;
+  let levelerTargetDb = 0;
+  let levelerDb = 0;
+  let levelerGain = 1;
   const emitter = createEmitter<MixerEvents>();
   const sources = new Map<string, Source>();
   /** Removed sources that still owe one faded frame. */
@@ -97,12 +117,41 @@ export function createMixer(options: MixerOptions = {}): Mixer {
       if (frame) addWithGainRamp(mix, frame, previous, next);
     }
 
+    dominant = pickDominant(sources.values(), dominant);
+
+    // Leveler: while the dominant source carries sound, the mix is measured and
+    // brought towards the target, within bounds. The gains above were computed
+    // from raw levels, so the duplicate suppression is untouched. Pauses and the
+    // meter's release tail teach it nothing, so the gain holds through silence.
+    const previousLevelerGain = levelerGain;
+    if (leveler) {
+      const { level } = mixMeter.update(mix);
+      const lead = dominant === null ? undefined : sources.get(dominant);
+      if (lead && lead.reading.raw >= lead.reading.floor * LEVELER_GATE) {
+        const levelDb = linearToDb(level);
+        referenceDb =
+          referenceDb === null
+            ? levelDb
+            : referenceDb +
+              (levelDb - referenceDb) *
+                (levelDb > referenceDb ? REFERENCE_ATTACK : REFERENCE_RELEASE);
+        levelerTargetDb = Math.min(
+          LEVELER_MAX_BOOST_DB,
+          Math.max(-LEVELER_MAX_CUT_DB, LEVELER_TARGET_DBFS - referenceDb),
+        );
+      }
+      // Smoothed in dB, so a cut and a boost of the same size take the same time.
+      levelerDb += (levelerTargetDb - levelerDb) * LEVELER_SMOOTHING;
+      levelerGain = dbToLinear(levelerDb);
+      if (previousLevelerGain !== 1 || levelerGain !== 1)
+        applyGainRamp(mix, previousLevelerGain, levelerGain);
+    }
+
     // Float until here so the sum can exceed full scale without wrapping; the
     // limiter brings it back under, then it is converted to int16 once.
     const limiterGain = limiter.process(mix);
     const pcm = new Int16Array(FRAME_SAMPLES);
     floatToPcm16(mix, pcm);
-    dominant = pickDominant(sources.values(), dominant);
     sequence++;
 
     emitter.emit('frame', {
@@ -110,6 +159,7 @@ export function createMixer(options: MixerOptions = {}): Mixer {
       pcm,
       dominant,
       limiterGain,
+      levelerGain,
       sources: [...sources.values()].map((s) => ({
         id: s.id,
         state: s.state,

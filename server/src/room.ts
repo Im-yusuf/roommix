@@ -37,12 +37,14 @@ export function createRoom(name: string, options: RoomOptions = {}) {
   const maxParticipants = options.maxParticipants ?? MAX_ROOM_SIZE;
   let dominant: string | null = null;
   let sequence = 0;
+  let levelerGain = 1;
 
   // Fan-out: every mixed frame goes to each subscriber as one binary message.
   mixer.on('frame', (frame) => {
     // Remembered for the next roster, which is sent on its own timer.
     dominant = frame.dominant;
     sequence = frame.sequence;
+    levelerGain = frame.levelerGain;
     // A byte view over the same memory, serialised once and shared by every send.
     const bytes = new Uint8Array(frame.pcm.buffer, frame.pcm.byteOffset, frame.pcm.byteLength);
     for (const participant of participants.values()) {
@@ -86,7 +88,14 @@ export function createRoom(name: string, options: RoomOptions = {}) {
         skipped: p.skipped,
       };
     });
-    return { type: 'roster', participants: entries, dominant, strategy: mixer.strategy, sequence };
+    return {
+      type: 'roster',
+      participants: entries,
+      dominant,
+      strategy: mixer.strategy,
+      sequence,
+      levelerDb: Math.round(20 * Math.log10(levelerGain) * 10) / 10,
+    };
   }
 
   function getParticipant(clientId: string): Participant {

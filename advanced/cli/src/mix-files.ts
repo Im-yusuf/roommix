@@ -7,6 +7,11 @@ import {
   type WavData,
 } from '@roommix/core';
 
+export interface MixFilesOptions {
+  /** Level the mix after the strategy, as the live service does. Default true. */
+  leveler?: boolean;
+}
+
 export interface MixFilesResult {
   /** 16 kHz mono PCM16. Runs about 100 ms past the longest input while the buffers drain. */
   pcm: Int16Array;
@@ -21,8 +26,9 @@ export interface MixFilesResult {
 export function mixFiles(
   inputs: WavData[],
   strategy: StrategyName = 'gain-sharing',
+  options: MixFilesOptions = {},
 ): MixFilesResult {
-  const mixer = createMixer({ strategy });
+  const mixer = createMixer({ strategy, leveler: options.leveler ?? true });
   const frames: Int16Array[] = [];
   mixer.on('frame', (frame) => frames.push(frame.pcm));
 

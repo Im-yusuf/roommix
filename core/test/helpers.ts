@@ -130,6 +130,8 @@ export interface SimSource {
 
 export interface SimOptions {
   strategy?: StrategyName;
+  /** Default false here, so measurements see the plain weighted sum; the mixer itself defaults to true. */
+  leveler?: boolean;
   durationMs: number;
   sources: SimSource[];
   /** Runs once before any source joins; attach listeners here. */
@@ -152,7 +154,10 @@ interface Feed {
  * arrive after any simulated network delay, then the mixer ticks once.
  */
 export function simulate(options: SimOptions) {
-  const mixer = createMixer({ strategy: options.strategy ?? 'gain-sharing' });
+  const mixer = createMixer({
+    strategy: options.strategy ?? 'gain-sharing',
+    leveler: options.leveler ?? false,
+  });
   const frames: MixedFrame[] = [];
   mixer.on('frame', (frame) => {
     frames.push(frame);

@@ -96,6 +96,7 @@ export function createApp(store: Store) {
           dominant: message.dominant,
           strategy: message.strategy,
           sequence: message.sequence,
+          levelerDb: message.levelerDb,
         });
         return;
       case 'error':
