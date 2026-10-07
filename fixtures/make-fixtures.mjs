@@ -14,7 +14,7 @@ import { join } from 'node:path';
 const GAP_SECONDS = 0.5;
 const CROSSTALK_GAIN = 10 ** (-10 / 20); // -10 dB
 const CROSSTALK_DELAY_MS = 3;
-const TRACK_GAIN = 0.7; // headroom so the sum of both voices never clips
+const TRACK_GAIN = 0.25; // a phone at arm's length: speech around -26 dBFS, far below clipping
 
 const turns = [
   ['A', 'Hi! Excuse me, do you know how to get to the central station from here?'],
