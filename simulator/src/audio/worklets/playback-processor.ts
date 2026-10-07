@@ -29,6 +29,8 @@ class PlaybackProcessor extends AudioWorkletProcessor {
   }
 
   private write(frame: Int16Array): void {
+    // Positions grow forever and are wrapped with `% CAPACITY` only on access,
+    // so `writePos - readPos` is always the buffered amount.
     const overflow = this.writePos + frame.length - Math.floor(this.readPos) - CAPACITY;
     if (overflow > 0) {
       this.readPos += overflow; // the buffer is full: let go of the oldest audio
@@ -43,6 +45,7 @@ class PlaybackProcessor extends AudioWorkletProcessor {
     const out = outputs[0][0];
     if (!this.primed && this.writePos - this.readPos >= TARGET) this.primed = true;
     for (let i = 0; i < out.length; i++) {
+      // Interpolation needs two samples ahead; with fewer, play silence and refill to TARGET.
       if (!this.primed || this.writePos - Math.floor(this.readPos) < 2) {
         if (this.primed) {
           this.underruns++;
@@ -53,6 +56,7 @@ class PlaybackProcessor extends AudioWorkletProcessor {
       }
       const base = Math.floor(this.readPos);
       const frac = this.readPos - base;
+      // Linear interpolation between neighbours; with a 16 kHz context, step is 1 and frac stays 0.
       const a = this.ring[base % CAPACITY];
       const b = this.ring[(base + 1) % CAPACITY];
       out[i] = a + (b - a) * frac;

@@ -27,6 +27,9 @@ export const gainSharing: MixStrategy = {
       gains.fill(1 / readings.length);
       return;
     }
+    // Example: the talker's phone at activity 0.3 and the other phone hearing the
+    // same voice at 0.1 get gains 0.75 and 0.25, so the quiet copy enters the mix
+    // at 0.1 × 0.25 = 0.025 against 0.3 × 0.75 = 0.225: nine times quieter, not three.
     for (let i = 0; i < readings.length; i++) gains[i] /= total;
   },
 };

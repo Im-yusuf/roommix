@@ -38,9 +38,12 @@ export function createRoom(name: string, options: RoomOptions = {}) {
   let dominant: string | null = null;
   let sequence = 0;
 
+  // Fan-out: every mixed frame goes to each subscriber as one binary message.
   mixer.on('frame', (frame) => {
+    // Remembered for the next roster, which is sent on its own timer.
     dominant = frame.dominant;
     sequence = frame.sequence;
+    // A byte view over the same memory, serialised once and shared by every send.
     const bytes = new Uint8Array(frame.pcm.buffer, frame.pcm.byteOffset, frame.pcm.byteLength);
     for (const participant of participants.values()) {
       if (!participant.subscribed) continue;
@@ -70,6 +73,7 @@ export function createRoom(name: string, options: RoomOptions = {}) {
     const stats = new Map(mixer.stats().map((s) => [s.id, s]));
     const entries: RosterEntry[] = [...participants.values()].map((p) => {
       const s = stats.get(p.clientId);
+      // A participant who joined but never sent `start` has no mixer source: show them as idle.
       return {
         clientId: p.clientId,
         name: p.name,
@@ -115,6 +119,8 @@ export function createRoom(name: string, options: RoomOptions = {}) {
     ): { ok: true } | { ok: false; reason: 'room_full' } {
       const existing = participants.get(clientId);
       if (existing) {
+        // Same id again (a reload or reconnect): evict the old connection rather
+        // than leaving a ghost participant. It does not count against the cap.
         send(existing, {
           type: 'error',
           code: 'replaced',
@@ -140,6 +146,7 @@ export function createRoom(name: string, options: RoomOptions = {}) {
     /** Removes a participant, but only if `connection` is still the one it joined with. */
     remove(clientId: string, connection: Connection): void {
       const participant = participants.get(clientId);
+      // After a replace, the old socket's close event arrives late; it must not remove the new one.
       if (!participant || participant.connection !== connection) return;
       detach(participant);
       if (participants.size === 0) options.onEmpty?.();
@@ -148,7 +155,9 @@ export function createRoom(name: string, options: RoomOptions = {}) {
     /** Begins (or restarts) this participant's audio. Throws MixerError for a bad sample rate. */
     startSource(clientId: string, sampleRate: number, channels?: number): void {
       const participant = getParticipant(clientId);
+      // A restart (say, a new sample rate) replaces the source; the old one fades out.
       if (participant.hasSource) mixer.removeSource(clientId);
+      // Cleared first so the flag stays false if addSource throws for a bad rate.
       participant.hasSource = false;
       mixer.addSource(clientId, { sampleRate, channels });
       participant.hasSource = true;

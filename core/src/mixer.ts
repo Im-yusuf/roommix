@@ -27,7 +27,10 @@ import type {
   StrategyName,
 } from './types.js';
 
+// One-pole smoothing coefficient per frame: each frame a gain moves this
+// fraction of the remaining distance to its target (~63% after GAIN_SMOOTHING_MS).
 const GAIN_SMOOTHING = 1 - Math.exp(-FRAME_MS / GAIN_SMOOTHING_MS);
+/** A challenger must have this many times the current dominant's activity to take over. */
 const DOMINANT_RATIO = dbToLinear(DOMINANT_HYSTERESIS_DB);
 const MAX_CATCHUP_FRAMES = MAX_CATCHUP_MS / FRAME_MS;
 const STATS_INTERVAL_FRAMES = STATS_INTERVAL_MS / FRAME_MS;
@@ -48,12 +51,17 @@ export function createMixer(options: MixerOptions = {}): Mixer {
   /** Removed sources that still owe one faded frame. */
   const leaving: Source[] = [];
   const limiter = createLimiter();
+  // Reused every frame to avoid allocating in the hot path; only the emitted
+  // PCM is a fresh array, because consumers may keep it.
   const mix = new Float32Array(FRAME_SAMPLES);
   const targetGains: number[] = [];
+  /** Lets stats go out on a state change without waiting for the next periodic report. */
   const lastReportedState = new Map<Source, SourceState>();
 
   let sequence = 0;
   let dominant: string | null = null;
+  // Frames owed are counted from a fixed origin rather than accumulated tick by
+  // tick, so uneven tick spacing and rounding can never make the clock drift.
   let clockOrigin: number | undefined;
   let framesSinceOrigin = 0;
   let framesSinceStats = 0;
@@ -63,10 +71,14 @@ export function createMixer(options: MixerOptions = {}): Mixer {
     emitter.emit('stats', source.stats());
   }
 
+  /** Produces one 20 ms output frame: pull, weigh, sum, limit, convert, emit. */
   function mixFrame(): void {
+    // Leaving sources still take part for one more frame so they can fade out.
     const active = [...sources.values(), ...leaving];
     mix.fill(0);
 
+    // Every source answers at once, with a frame or null (silence). Pulling also
+    // updates each source's level reading, which the strategy reads next.
     const frames = active.map((source) => source.pull());
     strategy.computeGains(
       active.map((source) => source.reading),
@@ -85,6 +97,8 @@ export function createMixer(options: MixerOptions = {}): Mixer {
       if (frame) addWithGainRamp(mix, frame, previous, next);
     }
 
+    // Float until here so the sum can exceed full scale without wrapping; the
+    // limiter brings it back under, then it is converted to int16 once.
     const limiterGain = limiter.process(mix);
     const pcm = new Int16Array(FRAME_SAMPLES);
     floatToPcm16(mix, pcm);
@@ -105,12 +119,14 @@ export function createMixer(options: MixerOptions = {}): Mixer {
       })),
     });
 
+    // Stats go out every STATS_INTERVAL_MS, and immediately for any source whose state changed.
     framesSinceStats++;
     const periodic = framesSinceStats >= STATS_INTERVAL_FRAMES;
     if (periodic) framesSinceStats = 0;
     for (const source of active) {
       if (periodic || lastReportedState.get(source) !== source.state) reportStats(source);
     }
+    // Sources that played their last faded frame are gone. Backwards, so splice skips nothing.
     for (let i = leaving.length - 1; i >= 0; i--) {
       if (leaving[i].state === 'left') {
         lastReportedState.delete(leaving[i]);
@@ -172,10 +188,12 @@ export function createMixer(options: MixerOptions = {}): Mixer {
         return;
       }
       if (clockOrigin === undefined) {
+        // First tick with a source: anchor the clock here. Frames are owed from now on.
         clockOrigin = nowMs;
         framesSinceOrigin = 0;
         return;
       }
+      // Whole frames that should exist by now, minus those already emitted.
       let owed = Math.floor((nowMs - clockOrigin) / FRAME_MS) - framesSinceOrigin;
       if (owed > MAX_CATCHUP_FRAMES) {
         // The host stalled for a long time. Emitting it all now would flood
@@ -202,6 +220,7 @@ function pickDominant(candidates: Iterable<Source>, current: string | null): str
   let bestActivity = 0;
   let currentActivity = 0;
   for (const source of candidates) {
+    // Activity is level above the source's own noise floor, the same measure gain sharing uses.
     const activity = Math.max(0, source.reading.level - source.reading.floor);
     if (source.id === current) currentActivity = activity;
     if (activity > bestActivity) {
@@ -209,7 +228,8 @@ function pickDominant(candidates: Iterable<Source>, current: string | null): str
       bestActivity = activity;
     }
   }
-  if (!best) return null;
+  if (!best) return null; // everyone is at their floor: nobody is talking
+  // Keep the current dominant unless the best challenger beats it by the hysteresis margin.
   if (current !== null && currentActivity > 0 && bestActivity < currentActivity * DOMINANT_RATIO)
     return current;
   return best.id;

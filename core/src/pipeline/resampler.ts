@@ -35,6 +35,7 @@ export function createResampler(inRate: number, outRate: number): Resampler {
 
   return {
     process(input) {
+      // Leftover samples from the previous chunk, then the new ones: one contiguous window.
       const buffer = new Float32Array(pending.length + input.length);
       buffer.set(pending);
       buffer.set(input, pending.length);
@@ -44,13 +45,18 @@ export function createResampler(inRate: number, outRate: number): Resampler {
 
       // An output at `position` needs input up to position + half.
       while (position + half < available) {
+        // Pick the precomputed filter for this output's fractional offset (0..1 → 0..PHASES).
         const phase = Math.round((fraction * RESAMPLER_PHASES) / outRate);
         const tapOffset = phase * tapCount;
+        // Index into `buffer` of the first input sample under the filter window.
         const base = position - half - pendingStart;
+        // The output sample is the dot product of the filter with the surrounding input.
         let acc = 0;
         for (let k = 0; k < tapCount; k++) acc += taps[tapOffset + k] * buffer[base + k];
         out.push(acc);
 
+        // Advance the output time by inRate/outRate input samples, in exact
+        // integer arithmetic: add inRate to the numerator, carry whole samples.
         fraction += inRate;
         const carry = Math.floor(fraction / outRate);
         position += carry;
@@ -87,9 +93,12 @@ function filterTableFor(inRate: number, outRate: number): FilterTable {
 }
 
 function buildFilterTable(inRate: number, outRate: number): FilterTable {
+  // Cut below the Nyquist frequency of the lower rate: when going down this removes what
+  // would alias; when going up it removes the images the new samples would create.
   const lowerRate = Math.min(inRate, outRate);
   const cutoff = (RESAMPLER_CUTOFF_RATIO * lowerRate) / inRate; // cycles per input sample
   const transition = (RESAMPLER_TRANSITION_RATIO * lowerRate) / inRate;
+  // A sharper transition needs a longer filter; `half` taps on each side of the centre.
   const half = Math.ceil(BLACKMAN_TRANSITION_BINS / transition / 2);
   const tapCount = 2 * half + 1;
   const windowHalfWidth = half + 1; // window reaches zero just beyond the outermost tap
@@ -103,15 +112,18 @@ function buildFilterTable(inRate: number, outRate: number): FilterTable {
     for (let k = 0; k < tapCount; k++) {
       // Tap k multiplies input sample (position - half + k); its distance from the output time is:
       const distance = frac + half - k;
+      // Ideal low-pass impulse response (sinc), tapered by the window so it can be finite.
       const value = sinc(2 * cutoff * distance) * 2 * cutoff * blackman(distance / windowHalfWidth);
       taps[p * tapCount + k] = value;
       sum += value;
     }
+    // Taps summing to exactly one means a constant input comes out unchanged at every phase.
     for (let k = 0; k < tapCount; k++) taps[p * tapCount + k] /= sum;
   }
   return { taps, half };
 }
 
+/** Normalised sinc, sin(πx)/(πx): the impulse response of an ideal low-pass filter. */
 function sinc(x: number): number {
   if (x === 0) return 1;
   const px = Math.PI * x;

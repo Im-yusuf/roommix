@@ -45,17 +45,23 @@ export function createJitterBuffer(
 ) {
   const targetFrames = Math.max(1, Math.round(targetMs / FRAME_MS));
   const maxFrames = Math.max(targetFrames + 1, Math.round(maxMs / FRAME_MS));
+  /** Oldest frame first. */
   const queue: Float32Array[] = [];
+  /** False until `targetFrames` have queued up (at the start and after every underrun); pulls return silence meanwhile. */
   let primed = false;
+  /** Set whenever the last frame played ended at a seam, so the next one must start from silence. */
   let needsFadeIn = true;
   let underruns = 0;
   let drops = 0;
   let inserts = 0;
 
+  // Drift detection: the shallowest and deepest queue seen during the current window.
   let windowMin = Number.POSITIVE_INFINITY;
   let windowMax = Number.NEGATIVE_INFINITY;
   let windowCount = 0;
+  /** A drift correction that has been decided but is waiting for a quiet frame. */
   let pending: 'drop' | 'insert' | null = null;
+  /** Frames the pending correction has waited; past QUIET_WAIT_FRAMES it acts anyway. */
   let pendingAge = 0;
 
   function resetWindow(): void {
@@ -70,6 +76,8 @@ export function createJitterBuffer(
     windowMax = Math.max(windowMax, depth);
     windowCount++;
     if (windowCount < WINDOW_FRAMES) return;
+    // Jitter makes depth wobble around the target; drift shifts the whole range.
+    // Only a range that sat entirely above or entirely below the target means drift.
     if (pending === null) {
       if (windowMin > targetFrames) pending = 'drop';
       else if (windowMax < targetFrames) pending = 'insert';
@@ -81,6 +89,7 @@ export function createJitterBuffer(
   return {
     push(frame: Float32Array): void {
       queue.push(frame);
+      // Too deep: drop the oldest frames, keeping the newest `targetFrames`, so latency snaps back to target.
       if (queue.length > maxFrames) {
         // Bursts follow stalls, so the last played frame already ended in a fade.
         const excess = queue.length - targetFrames;
@@ -92,6 +101,7 @@ export function createJitterBuffer(
 
     /** The next frame to play, or null when the mix should use silence for this source. */
     pull(): Float32Array | null {
+      // Still filling up: play silence until a full target's worth is waiting.
       if (!primed) {
         if (queue.length < targetFrames) return null;
         primed = true;
@@ -99,6 +109,8 @@ export function createJitterBuffer(
       observe(queue.length);
       const frame = queue.shift();
       if (!frame) {
+        // Ran dry. Go back to filling up, and drop any drift decision: an
+        // underrun says nothing reliable about the clock.
         underruns++;
         primed = false;
         needsFadeIn = true;
@@ -111,6 +123,8 @@ export function createJitterBuffer(
         needsFadeIn = false;
       }
 
+      // Drift correction, if one is due. A drop removes 20 ms from a source that
+      // runs fast; an insert adds 20 ms to one that runs slow.
       if (pending !== null) {
         pendingAge++;
         const forced = pendingAge >= QUIET_WAIT_FRAMES;

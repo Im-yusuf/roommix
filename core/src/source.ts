@@ -52,6 +52,8 @@ export function createSource(id: string, options: SourceOptions, buffer: JitterB
   }
   const maxChunkSamples = (sampleRate * channels * MAX_CHUNK_MS) / 1000;
 
+  // The processing chain, in order. Each stage keeps its own state across chunks,
+  // so the output does not depend on how the audio was split when it was pushed.
   const dcBlocker = createDcBlocker(sampleRate);
   const resampler = createResampler(sampleRate, SAMPLE_RATE);
   const framer = createFramer();
@@ -95,6 +97,7 @@ export function createSource(id: string, options: SourceOptions, buffer: JitterB
         );
       }
       chunksIn++;
+      // int16 → float → mono → remove DC → resample to 16 kHz → cut into 20 ms frames → queue.
       const samples = toMono(pcm16ToFloat(pcm), channels);
       dcBlocker.process(samples);
       framer.push(resampler.process(samples), (frame) => jitter.push(frame));
@@ -110,15 +113,18 @@ export function createSource(id: string, options: SourceOptions, buffer: JitterB
       if (state === 'left') return null;
       const frame = jitter.pull();
       if (leaving) {
+        // Last frame: fade it so the source does not end on a click.
         if (frame) fadeOut(frame);
         state = 'left';
       } else if (frame) {
         consecutiveUnderruns = 0;
         state = 'live';
       } else if (state !== 'joining') {
+        // No frame, but a short gap is just jitter; only a sustained one is a stall.
         consecutiveUnderruns++;
         if (consecutiveUnderruns >= STALL_FRAMES) state = 'stalled';
       }
+      // A missing frame counts as silence, so the level of a stalled source decays to zero.
       reading = meter.update(frame ?? SILENCE);
       return frame;
     },

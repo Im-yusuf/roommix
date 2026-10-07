@@ -20,9 +20,13 @@ export function createLimiter() {
         const magnitude = Math.abs(frame[i]);
         if (magnitude > peak) peak = magnitude;
       }
+      // Where the gain would be if it kept recovering towards 1 this frame.
       const released = gain + (1 - gain) * RELEASE;
+      // If that would push this frame's peak over the ceiling, pull it down just enough instead.
       const target = peak * released > LIMITER_CEILING ? LIMITER_CEILING / peak : released;
 
+      // Ramp from the old gain to the new one across the frame; clamp anything
+      // the ramp has not caught yet (only possible in the first samples).
       const step = (target - gain) / frame.length;
       let g = gain;
       for (let i = 0; i < frame.length; i++) {
