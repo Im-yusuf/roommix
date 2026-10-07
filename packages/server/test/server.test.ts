@@ -37,6 +37,7 @@ describe('server end to end', () => {
     const health = await fetch(`http://127.0.0.1:${server.port}/healthz`);
     expect(health.status).toBe(200);
     expect(await health.text()).toBe('ok');
+    expect((await fetch(`http://127.0.0.1:${server.port}/health`)).status).toBe(200);
     expect((await fetch(`http://127.0.0.1:${server.port}/`)).status).toBe(404);
   });
 

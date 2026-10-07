@@ -317,5 +317,8 @@ export function createApp(store: Store) {
 }
 
 function wsUrl(): string {
+  // Same origin by default; a static host (Firebase Hosting) points at the Cloud Run server instead.
+  const configured = import.meta.env.VITE_WS_URL as string | undefined;
+  if (configured) return configured;
   return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 }

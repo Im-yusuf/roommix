@@ -5,6 +5,9 @@ people in the same room each record on their own phone; every device hears
 both voices. This service takes those live streams and merges them into one
 clean 16 kHz mono stream for backend processing.
 
+**Live demo:** <https://f2f-audio-mixer.web.app>. Open it on two phones (or in
+two tabs), join the same room, and press Start microphone on each.
+
 Three parts, one repository:
 
 | package | what it is |
@@ -83,8 +86,33 @@ Browsers only expose the microphone on a secure page, so a phone needs HTTPS:
    Playing the mix through speakers in the same room feeds it back into every
    microphone.
 
-The production server speaks plain HTTP and WebSocket; put TLS termination in
-front of it (any reverse proxy or ingress) when deploying.
+## Deploying (Google Cloud)
+
+The live demo is two deployments from this repository:
+
+- **Cloud Run** runs the server from the `Dockerfile` (service
+  `f2f-audio-mixer`, region `europe-west1`). Rooms live in the server's memory,
+  so the service is pinned to one instance; Cloud Run gives it TLS, which is
+  what lets phones use the microphone. It closes a WebSocket after an hour,
+  and the page reconnects and rejoins on its own.
+- **Firebase Hosting** serves the built simulator from `apps/simulator/dist`.
+  That build is told where the mixer lives through `VITE_WS_URL`, so the page
+  opens its WebSocket straight to Cloud Run; without that variable the page
+  connects to whatever host served it, which is what the Docker image and
+  `pnpm start` rely on.
+
+With the `gcloud` and `firebase` CLIs signed in to a project that has billing:
+
+```bash
+pnpm release:server   # builds the image with Cloud Build and deploys the Cloud Run revision
+pnpm release:web      # builds the page against the Cloud Run URL and deploys Firebase Hosting
+```
+
+`pnpm release` runs both. (The scripts are not called `deploy` because pnpm
+has a built-in `deploy` command, which the Dockerfile uses.) The project and region are written into the scripts
+in `package.json` and `.firebaserc`; change them there for another project.
+Anywhere else, the production server speaks plain HTTP and WebSocket: put TLS
+termination in front of it (any reverse proxy or ingress).
 
 ## What the simulator shows
 

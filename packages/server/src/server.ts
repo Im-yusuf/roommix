@@ -23,7 +23,8 @@ export async function startServer(options: ServerOptions) {
   const serveFiles = options.staticDir ? serveStatic(options.staticDir) : undefined;
 
   const http = createHttpServer((request, response) => {
-    if (request.url === '/healthz') {
+    // `/health` too: Google's edge answers `/healthz` itself on Cloud Run, so it never arrives here.
+    if (request.url === '/healthz' || request.url === '/health') {
       response.writeHead(200, { 'content-type': 'text/plain' }).end('ok');
       return;
     }

@@ -1,0 +1,11 @@
+# Source upload for `gcloud run deploy --source`: the image is built from the Dockerfile.
+.git
+.github
+.gcloudignore
+.firebase
+node_modules
+**/node_modules
+**/dist
+out
+coverage
+*.log
